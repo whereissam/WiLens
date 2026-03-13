@@ -58,6 +58,18 @@ select {
   padding: 3rem;
 }
 
+.hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+.hero-logo {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 auto;
+}
+
 .eyebrow {
   margin: 0 0 0.8rem;
   color: #d4d086;
@@ -137,7 +149,8 @@ h1 {
 .video-frame {
   position: relative;
   overflow: hidden;
-  min-height: 420px;
+  min-height: 320px;
+  max-height: 360px;
   border-radius: 24px;
   background:
     linear-gradient(180deg, rgba(1, 7, 5, 0.15), rgba(1, 7, 5, 0.45)),
@@ -159,7 +172,7 @@ h1 {
 .scan-overlay::before {
   content: "";
   position: absolute;
-  inset: 14% 18%;
+  inset: 16% 20%;
   border: 2px solid rgba(241, 215, 122, 0.9);
   border-radius: 28px;
   box-shadow: 0 0 0 999px rgba(3, 8, 6, 0.35);
@@ -168,8 +181,8 @@ h1 {
 .scan-overlay::after {
   content: "";
   position: absolute;
-  left: 18%;
-  right: 18%;
+  left: 20%;
+  right: 20%;
   top: 50%;
   height: 2px;
   background: linear-gradient(90deg, transparent, #f1d77a, transparent);
@@ -260,7 +273,8 @@ h1 {
   }
 
   .video-frame {
-    min-height: 320px;
+    min-height: 280px;
+    max-height: 320px;
   }
 
   .details {

@@ -23,6 +23,10 @@ Production app bundle:
 
 - `src-tauri/target/release/bundle/macos/WiLens.app`
 
+## Screenshot
+
+![WiLens app screenshot](web/public/screenshot.png)
+
 ## Run
 
 Open the built app:
@@ -54,4 +58,5 @@ cargo tauri build
 ## Project Docs
 
 - [Product scope and architecture](docs/product-scope.md)
+- [Usage guide](docs/usage.md)
 - [Implementation TODO](docs/todo.md)

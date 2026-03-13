@@ -19,7 +19,10 @@ if (!app) {
 app.innerHTML = `
   <main class="shell">
     <section class="hero">
-      <p class="eyebrow">macOS Wi-Fi QR utility</p>
+      <div class="hero-badge">
+        <img src="/app-icon.svg" alt="" class="hero-logo" />
+        <p class="eyebrow">macOS Wi-Fi QR utility</p>
+      </div>
       <h1>Point your camera at a Wi-Fi QR code.</h1>
       <p class="lede">
         WiLens scans the code, extracts the network details, and lets you join

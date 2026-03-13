@@ -1,11 +1,16 @@
 # Dependencies
 node_modules/
+web/node_modules/
 
 # Frontend build output
 dist/
+web/dist/
 
 # Tauri / Rust build output
 src-tauri/target/
+
+# Astro
+web/.astro/
 
 # Logs
 *.log
