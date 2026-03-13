@@ -1,0 +1,19 @@
+{
+  "name": "wilens",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.8.0",
+    "@zxing/browser": "^0.1.5"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.2",
+    "vite": "^7.1.3"
+  }
+}
