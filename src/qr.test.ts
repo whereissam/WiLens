@@ -1,0 +1,133 @@
+import { describe, expect, it } from "vitest";
+import { parseWifiQr } from "./qr";
+
+describe("parseWifiQr", () => {
+  it("parses a standard WPA payload", () => {
+    const payload = parseWifiQr("WIFI:T:WPA;S:MyWifi;P:mypassword;;");
+
+    expect(payload.ssid).toBe("MyWifi");
+    expect(payload.security).toBe("WPA");
+    expect(payload.password).toBe("mypassword");
+    expect(payload.hidden).toBe(false);
+  });
+
+  it("parses a WEP payload", () => {
+    const payload = parseWifiQr("WIFI:T:WEP;S:OldNet;P:secret;;");
+
+    expect(payload.security).toBe("WEP");
+    expect(payload.password).toBe("secret");
+  });
+
+  it("normalizes lowercase security types", () => {
+    const payload = parseWifiQr("WIFI:T:wpa;S:Net;P:pw;;");
+
+    expect(payload.security).toBe("WPA");
+  });
+
+  it("treats fields in any order", () => {
+    const payload = parseWifiQr("WIFI:S:Net;P:pw;T:WPA;;");
+
+    expect(payload.ssid).toBe("Net");
+    expect(payload.password).toBe("pw");
+    expect(payload.security).toBe("WPA");
+  });
+
+  describe("open networks", () => {
+    it("parses an explicit nopass network without a password", () => {
+      const payload = parseWifiQr("WIFI:T:nopass;S:OpenNet;;");
+
+      expect(payload.security).toBe("nopass");
+      expect(payload.password).toBeUndefined();
+    });
+
+    it("treats a missing security type as nopass when no password is present", () => {
+      const payload = parseWifiQr("WIFI:S:OpenNet;;");
+
+      expect(payload.security).toBe("nopass");
+      expect(payload.password).toBeUndefined();
+    });
+
+    it("drops any password supplied for a nopass network", () => {
+      const payload = parseWifiQr("WIFI:T:nopass;S:OpenNet;P:ignored;;");
+
+      expect(payload.security).toBe("nopass");
+      expect(payload.password).toBeUndefined();
+    });
+  });
+
+  describe("hidden flag", () => {
+    it("reads H:true", () => {
+      const payload = parseWifiQr("WIFI:T:WPA;S:Net;P:pw;H:true;;");
+
+      expect(payload.hidden).toBe(true);
+    });
+
+    it("is case-insensitive for the hidden flag", () => {
+      const payload = parseWifiQr("WIFI:T:WPA;S:Net;P:pw;H:True;;");
+
+      expect(payload.hidden).toBe(true);
+    });
+
+    it("defaults hidden to false", () => {
+      const payload = parseWifiQr("WIFI:T:WPA;S:Net;P:pw;;");
+
+      expect(payload.hidden).toBe(false);
+    });
+  });
+
+  describe("escaped characters", () => {
+    it("unescapes a semicolon in the password", () => {
+      const payload = parseWifiQr("WIFI:T:WPA;S:Net;P:pa\\;ss;;");
+
+      expect(payload.password).toBe("pa;ss");
+    });
+
+    it("unescapes a colon in the SSID", () => {
+      const payload = parseWifiQr("WIFI:T:WPA;S:My\\:Net;P:pw;;");
+
+      expect(payload.ssid).toBe("My:Net");
+    });
+
+    it("unescapes a backslash", () => {
+      const payload = parseWifiQr("WIFI:T:WPA;S:Net;P:pa\\\\ss;;");
+
+      expect(payload.password).toBe("pa\\ss");
+    });
+
+    it("unescapes a comma", () => {
+      const payload = parseWifiQr("WIFI:T:WPA;S:My\\,Net;P:pw;;");
+
+      expect(payload.ssid).toBe("My,Net");
+    });
+  });
+
+  describe("malformed payloads", () => {
+    it("rejects a non-Wi-Fi payload", () => {
+      expect(() => parseWifiQr("https://example.com")).toThrow(
+        /not a Wi-Fi payload/i,
+      );
+    });
+
+    it("rejects a payload missing the SSID", () => {
+      expect(() => parseWifiQr("WIFI:T:WPA;P:pw;;")).toThrow(/missing the SSID/i);
+    });
+
+    it("rejects a payload with a blank SSID", () => {
+      expect(() => parseWifiQr("WIFI:T:WPA;S: ;P:pw;;")).toThrow(
+        /missing the SSID/i,
+      );
+    });
+
+    it("rejects a secured network with no password", () => {
+      expect(() => parseWifiQr("WIFI:T:WPA;S:Net;;")).toThrow(
+        /missing the password/i,
+      );
+    });
+
+    it("rejects an unsupported security type", () => {
+      expect(() => parseWifiQr("WIFI:T:WPA3-ENT;S:Net;P:pw;;")).toThrow(
+        /Unsupported Wi-Fi security type/i,
+      );
+    });
+  });
+});

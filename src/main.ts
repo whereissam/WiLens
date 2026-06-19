@@ -20,7 +20,7 @@ app.innerHTML = `
   <main class="shell">
     <section class="hero">
       <div class="hero-badge">
-        <img src="/app-icon.svg" alt="" class="hero-logo" />
+        <img src="/wilen-logo.png" alt="" class="hero-logo" />
         <p class="eyebrow">macOS Wi-Fi QR utility</p>
       </div>
       <h1>Point your camera at a Wi-Fi QR code.</h1>
@@ -32,7 +32,7 @@ app.innerHTML = `
         <button id="start-scan" class="button button-primary">Start camera</button>
         <button id="rescan" class="button button-secondary" disabled>Scan again</button>
       </div>
-      <p id="status" class="status">Camera is idle.</p>
+      <p id="status" class="status" role="status" aria-live="polite">Camera is idle.</p>
     </section>
 
     <section class="scanner-panel">

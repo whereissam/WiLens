@@ -37,9 +37,12 @@ export function parseWifiQr(raw: string): WifiPayload {
     throw new Error("Wi-Fi QR code is missing the SSID.");
   }
 
-  const type = (values.get("T") ?? "WPA").trim();
-  const security = normalizeSecurity(type);
   const password = values.get("P") ?? "";
+  const rawType = values.get("T")?.trim() ?? "";
+  // A missing or empty security type is ambiguous. Infer it: a payload that
+  // carries a password is almost certainly secured, while one without is open.
+  const security =
+    rawType === "" ? (password ? "WPA" : "nopass") : normalizeSecurity(rawType);
   const hidden = (values.get("H") ?? "").toLowerCase() === "true";
 
   if (security !== "nopass" && !password) {

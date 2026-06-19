@@ -92,6 +92,15 @@ fn sanitize_required(value: &str, label: &str) -> Result<String, ErrorResponse> 
         });
     }
 
+    // networksetup receives these values as positional arguments. A value that
+    // begins with '-' would be misread as a command-line flag (argument
+    // injection), so reject it rather than risk an unexpected invocation.
+    if value.starts_with('-') {
+        return Err(ErrorResponse {
+            message: format!("{label} must not start with '-'."),
+        });
+    }
+
     Ok(value.to_string())
 }
 
@@ -181,7 +190,53 @@ pub fn run() {
 
 #[cfg(test)]
 mod tests {
-    use super::parse_hardware_ports;
+    use super::{normalize_security, parse_hardware_ports, sanitize_optional, sanitize_required};
+
+    #[test]
+    fn sanitize_required_accepts_a_normal_value() {
+        assert_eq!(sanitize_required("MyWifi", "SSID").unwrap(), "MyWifi");
+    }
+
+    #[test]
+    fn sanitize_required_rejects_empty_and_whitespace() {
+        assert!(sanitize_required("", "SSID").is_err());
+        assert!(sanitize_required("   ", "SSID").is_err());
+    }
+
+    #[test]
+    fn sanitize_required_rejects_control_characters() {
+        assert!(sanitize_required("My\nWifi", "SSID").is_err());
+        assert!(sanitize_required("My\0Wifi", "SSID").is_err());
+        assert!(sanitize_required("My\rWifi", "SSID").is_err());
+    }
+
+    #[test]
+    fn sanitize_required_rejects_leading_dash() {
+        assert!(sanitize_required("-setairportpower", "SSID").is_err());
+    }
+
+    #[test]
+    fn sanitize_optional_maps_present_and_absent_values() {
+        assert_eq!(
+            sanitize_optional(Some("pw"), "Password").unwrap(),
+            Some("pw".to_string())
+        );
+        assert_eq!(sanitize_optional(Some(""), "Password").unwrap(), None);
+        assert_eq!(sanitize_optional(None, "Password").unwrap(), None);
+    }
+
+    #[test]
+    fn normalize_security_accepts_supported_types() {
+        assert_eq!(normalize_security("WPA").unwrap(), "wpa");
+        assert_eq!(normalize_security("wep").unwrap(), "wep");
+        assert_eq!(normalize_security(" nopass ").unwrap(), "nopass");
+    }
+
+    #[test]
+    fn normalize_security_rejects_unsupported_types() {
+        assert!(normalize_security("wpa3-enterprise").is_err());
+        assert!(normalize_security("").is_err());
+    }
 
     #[test]
     fn parses_networksetup_hardware_ports() {

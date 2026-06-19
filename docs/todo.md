@@ -77,3 +77,45 @@
 - [x] Parsed network details are shown before joining.
 - [x] The app attempts Wi-Fi join through Rust successfully.
 - [x] Errors are understandable enough to debug field issues.
+
+---
+
+## Phase 7: Post-Review Improvements
+
+Derived from the engineering / security / design review (2026-06-19).
+Business items intentionally dropped — WiLens is an open-source utility.
+
+### 7a. Testing (highest risk: zero coverage on the most logic-heavy code)
+
+- [x] Add a test runner (Vitest) to the frontend.
+- [x] Test `parseWifiQr` with WPA/WPA2 payloads.
+- [x] Test `parseWifiQr` with open (`nopass`) networks.
+- [x] Test escaped characters in SSID/password (`\;`, `\:`, `\\`, `\,`).
+- [x] Test malformed / partial QR strings (missing `WIFI:`, missing SSID, missing password, bad security type).
+- [x] Add Rust unit tests for `sanitize_required`, `sanitize_optional`, `normalize_security`.
+- [x] Improve open-network handling: infer missing/empty `T` from password presence instead of defaulting to WPA.
+
+### 7b. Reliability
+
+- [ ] Verify `networksetup -setairportnetwork` works on the target macOS version (it is deprecated on recent releases). *(requires running on the target Mac)*
+- [x] Document the `Copy password` manual fallback as the supported Plan B if the join command fails. *(already in `docs/usage.md`)*
+
+### 7c. Security hardening
+
+- [x] Set a restrictive CSP in `tauri.conf.json` (replace `"csp": null`).
+- [x] Reject SSID/password values beginning with `-` to prevent `networksetup` argument injection.
+- [x] Run a dependency audit. *(remaining advisories are dev-only transitive deps — vite/vitest → picomatch — not shipped in the app)*
+
+### 7d. Frontend / accessibility
+
+- [x] Add `aria-live="polite"` to the `#status` element so screen readers announce scan/join results.
+
+### 7e. Landing page
+
+- [x] Replace the dead `githubHref = "#"` links with the real repo URL (or remove them).
+- [x] Delete the leftover commented-out `signal-logo` markup.
+- [x] Fix the broken favicon reference (`/app-logo.svg` did not exist) and wire in the new brand assets.
+
+### 7f. Tooling / CI
+
+- [x] Add a CI workflow: `tsc --noEmit`, `vitest`, `cargo test`, `cargo clippy`.
