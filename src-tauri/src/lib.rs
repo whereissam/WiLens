@@ -93,10 +93,27 @@ fn normalize_security(value: &str) -> Result<String, ErrorResponse> {
     }
 }
 
+#[cfg(target_os = "macos")]
+fn request_location_authorization() {
+    use objc2_core_location::CLLocationManager;
+    unsafe {
+        let manager = CLLocationManager::new();
+        manager.requestWhenInUseAuthorization();
+        // Keep the manager alive for the app's lifetime so the asynchronous
+        // authorization prompt can complete.
+        std::mem::forget(manager);
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_log::Builder::default().build())
+        .setup(|_app| {
+            #[cfg(target_os = "macos")]
+            request_location_authorization();
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![join_wifi])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
