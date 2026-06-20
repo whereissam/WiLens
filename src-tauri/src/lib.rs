@@ -30,13 +30,20 @@ fn join_wifi(request: JoinWifiRequest) -> Result<JoinWifiResponse, ErrorResponse
     let security = normalize_security(&request.security)?;
     let password = sanitize_optional(request.password.as_deref(), "Password")?;
 
-    let interface = wifi::join_via_networksetup(&ssid, &security, password.as_deref())
-        .map_err(|message| ErrorResponse { message })?;
+    let (interface, method) = match wifi::join_via_corewlan(&ssid, password.as_deref()) {
+        Ok(interface) => (interface, "corewlan"),
+        Err(corewlan_error) => {
+            log::warn!("CoreWLAN join failed, falling back to networksetup: {corewlan_error}");
+            let interface = wifi::join_via_networksetup(&ssid, &security, password.as_deref())
+                .map_err(|message| ErrorResponse { message })?;
+            (interface, "networksetup")
+        }
+    };
 
     Ok(JoinWifiResponse {
         interface,
         message: format!("Joined '{ssid}' successfully."),
-        method: "networksetup".to_string(),
+        method: method.to_string(),
     })
 }
 

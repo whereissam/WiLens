@@ -1,9 +1,52 @@
 use std::process::Command;
 
+#[cfg(target_os = "macos")]
+use objc2_core_wlan::CWWiFiClient;
+#[cfg(target_os = "macos")]
+use objc2_foundation::{NSError, NSString};
+
 #[derive(Debug)]
 pub struct HardwarePort {
     pub port: String,
     pub device: String,
+}
+
+/// Join a network via CoreWLAN as the logged-in user — no admin prompt.
+/// Requires Location Services permission for the scan. Returns the interface
+/// name on success.
+#[cfg(target_os = "macos")]
+pub fn join_via_corewlan(ssid: &str, password: Option<&str>) -> Result<String, String> {
+    unsafe {
+        let client = CWWiFiClient::sharedWiFiClient();
+        let interface = client
+            .interface()
+            .ok_or_else(|| "No Wi-Fi interface available.".to_string())?;
+
+        let ns_ssid = NSString::from_str(ssid);
+        let networks = interface
+            .scanForNetworksWithName_includeHidden_error(Some(&ns_ssid), true)
+            .map_err(|err| nserror_message(&err))?;
+
+        let network = networks
+            .anyObject()
+            .ok_or_else(|| format!("Network '{ssid}' was not found in range."))?;
+
+        let ns_password = password.map(NSString::from_str);
+        interface
+            .associateToNetwork_password_error(&network, ns_password.as_deref())
+            .map_err(|err| nserror_message(&err))?;
+
+        Ok(interface
+            .interfaceName()
+            .map(|name| name.to_string())
+            .unwrap_or_else(|| "Wi-Fi".to_string()))
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn nserror_message(error: &NSError) -> String {
+    // NSError implements Display in objc2-foundation (via localizedDescription).
+    error.to_string()
 }
 
 /// Join a network using the legacy `networksetup` command. Requires admin
