@@ -16,13 +16,20 @@ Example QR payload:
 WIFI:T:WPA;S:MyWifi;P:mypassword;;
 ```
 
+## Download
+
+Grab the latest macOS build from the
+[Releases page](https://github.com/whereissam/WiLens/releases/latest)
+(`WiLens.dmg`). Apple Silicon only. The app is unsigned, so on first launch
+right-click **WiLens → Open** to get past Gatekeeper.
+
 ## Current Status
 
-The MVP is implemented and builds successfully.
-
-Production app bundle:
+WiLens joins Wi-Fi via CoreWLAN (no administrator prompt), verifying the
+connection and falling back to `networksetup` if needed. Local builds produce:
 
 - `src-tauri/target/release/bundle/macos/WiLens.app`
+- `src-tauri/target/release/bundle/dmg/WiLens_<version>_aarch64.dmg`
 
 ## Screenshot
 
