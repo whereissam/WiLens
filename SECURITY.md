@@ -111,10 +111,12 @@ WiLens yourself:
 
 ## Reporting a vulnerability
 
-If you find a security issue, please **do not** open a public issue. Instead,
-email **tools@gaib.ai** or use GitHub's
+If you find a security issue, please **do not** open a public issue. The preferred
+way to report it privately is GitHub's
 [private security advisory](https://github.com/whereissam/WiLens/security/advisories/new)
-feature. We aim to acknowledge reports within a few days.
+feature. You can also reach the maintainer any other way through GitHub — for
+example, by opening a pull request with a fix. We aim to acknowledge reports
+within a few days.
 
 ---
 
