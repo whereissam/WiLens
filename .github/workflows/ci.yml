@@ -34,3 +34,17 @@ jobs:
         run: cargo clippy --all-targets -- -D warnings
       - name: Test
         run: cargo test
+
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - name: Audit frontend dependencies
+        run: bun install --frozen-lockfile && bun audit
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Audit Rust dependencies
+        run: |
+          cargo install cargo-audit --locked
+          cargo audit
+        working-directory: src-tauri
