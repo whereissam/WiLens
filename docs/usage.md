@@ -40,11 +40,14 @@ WIFI:T:WPA;S:MyWifi;P:mypassword;;
 
 WiLens may trigger system prompts for:
 
-- camera permission
-- administrator approval
-- keychain or networking permission
-
-This happens because the app uses macOS system networking tools to join Wi-Fi.
+- **Camera** — to scan the QR code.
+- **Location** — macOS requires Location access before *any* app can scan for
+  Wi-Fi networks. WiLens only uses it to find and join your network; it never
+  collects, stores, or shares your location. Granting it lets WiLens join
+  quietly via CoreWLAN, with no administrator prompt.
+- **Administrator approval** — only as a fallback. If the quiet CoreWLAN join
+  can't connect (e.g. Location was denied), WiLens falls back to the
+  `networksetup` tool, which asks for an administrator name and password.
 
 ## Copy Password Fallback
 

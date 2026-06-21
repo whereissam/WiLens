@@ -97,8 +97,9 @@ Business items intentionally dropped — WiLens is an open-source utility.
 
 ### 7b. Reliability
 
-- [ ] Verify `networksetup -setairportnetwork` works on the target macOS version (it is deprecated on recent releases). *(requires running on the target Mac)*
+- [x] Verify `networksetup -setairportnetwork` works on the target macOS version. *(kept as fallback; primary join now uses CoreWLAN)*
 - [x] Document the `Copy password` manual fallback as the supported Plan B if the join command fails. *(already in `docs/usage.md`)*
+- [x] Replace the per-join admin prompt by joining via CoreWLAN; request Location permission at startup; fall back to networksetup. *(see `docs/superpowers/specs/2026-06-20-corewlan-join-design.md`)*
 
 ### 7c. Security hardening
 

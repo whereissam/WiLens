@@ -7,7 +7,8 @@ WiLens is a macOS desktop app that scans a Wi-Fi QR code and joins the network.
 1. Opens the camera in a desktop window.
 2. Scans a standard Wi-Fi QR code.
 3. Shows the network before joining.
-4. Uses macOS to switch to that Wi-Fi network.
+4. Joins the network via CoreWLAN — no administrator prompt — and falls back to
+   `networksetup` only if that can't connect.
 
 Example QR payload:
 
@@ -49,11 +50,20 @@ bun run build
 cargo tauri build
 ```
 
+## Permissions
+
+- **Camera** — to scan the QR code.
+- **Location** — macOS requires Location access before *any* app can scan for
+  Wi-Fi networks, so it asks the first time you open WiLens. WiLens uses it only
+  to find and join your network; it never collects, stores, or shares your
+  location. Granting it lets WiLens join quietly with no administrator prompt.
+
 ## Notes
 
-- WiLens currently targets macOS.
-- macOS may show an administrator or keychain approval prompt when joining a network because the app uses `networksetup`.
-- The system prompt is controlled by macOS, not by the app UI.
+- WiLens currently targets macOS (Apple Silicon).
+- If Location is denied or the quiet join can't connect, WiLens falls back to the
+  `networksetup` tool, which shows a macOS administrator approval prompt.
+- All permission prompts are controlled by macOS, not by the app UI.
 
 ## Project Docs
 

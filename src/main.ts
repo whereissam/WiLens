@@ -59,8 +59,10 @@ app.innerHTML = `
           </div>
         </dl>
         <p class="system-note">
-          Joining may trigger a macOS administrator approval prompt because the
-          app uses <code>networksetup</code> to change the active Wi-Fi network.
+          macOS requires Location access to scan for Wi-Fi networks, so it asks
+          the first time — WiLens never tracks your location. If the quick join
+          can't connect, it falls back to <code>networksetup</code>, which may
+          show a macOS administrator prompt.
         </p>
         <div class="result-actions">
           <button id="join-network" class="button button-primary" disabled>Join network</button>

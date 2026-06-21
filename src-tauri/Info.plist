@@ -4,5 +4,7 @@
 <dict>
   <key>NSCameraUsageDescription</key>
   <string>WiLens uses the camera to scan Wi-Fi QR codes and connect to the selected network.</string>
+  <key>NSLocationWhenInUseUsageDescription</key>
+  <string>macOS requires Location access before any app can scan for Wi-Fi networks. WiLens uses it only to find and join the network you scanned — it never collects, stores, or shares your location.</string>
 </dict>
 </plist>
