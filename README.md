@@ -53,8 +53,14 @@ cargo tauri dev
 Build production again:
 
 ```bash
-bun run build
 cargo tauri build
+```
+
+Build and produce the release installer named `WiLens.dmg` (what the download
+page links to) in one step:
+
+```bash
+bun run release:dmg
 ```
 
 ## Permissions
