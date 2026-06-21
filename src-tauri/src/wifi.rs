@@ -1,9 +1,27 @@
 use std::process::Command;
+#[cfg(target_os = "macos")]
+use std::time::Duration;
 
 #[cfg(target_os = "macos")]
-use objc2_core_wlan::CWWiFiClient;
+use objc2_core_wlan::{CWInterface, CWWiFiClient};
 #[cfg(target_os = "macos")]
 use objc2_foundation::{NSError, NSString};
+
+/// Maximum number of scan + associate attempts before giving up on CoreWLAN.
+/// `associateToNetwork` can report success before the link is actually up; the
+/// second attempt is what reliably connects (the behavior users hit manually as
+/// a "double click"), so we retry automatically.
+#[cfg(target_os = "macos")]
+const COREWLAN_MAX_ATTEMPTS: u32 = 3;
+
+/// How long to wait for the interface to report the target SSID after an
+/// associate call returns, before treating the attempt as not-yet-connected.
+#[cfg(target_os = "macos")]
+const COREWLAN_VERIFY_TIMEOUT: Duration = Duration::from_millis(2500);
+
+/// Polling interval while verifying the connection.
+#[cfg(target_os = "macos")]
+const COREWLAN_VERIFY_INTERVAL: Duration = Duration::from_millis(300);
 
 #[derive(Debug)]
 pub struct HardwarePort {
@@ -14,6 +32,11 @@ pub struct HardwarePort {
 /// Join a network via CoreWLAN as the logged-in user — no admin prompt.
 /// Requires Location Services permission for the scan. Returns the interface
 /// name on success.
+///
+/// `associateToNetwork` may return `Ok` before the connection is established, so
+/// after each associate we poll the interface's current SSID and only report
+/// success once it actually matches the target. If it does not connect within
+/// the timeout we re-scan and try again, up to `COREWLAN_MAX_ATTEMPTS`.
 #[cfg(target_os = "macos")]
 pub fn join_via_corewlan(ssid: &str, password: Option<&str>) -> Result<String, String> {
     unsafe {
@@ -23,24 +46,73 @@ pub fn join_via_corewlan(ssid: &str, password: Option<&str>) -> Result<String, S
             .ok_or_else(|| "No Wi-Fi interface available.".to_string())?;
 
         let ns_ssid = NSString::from_str(ssid);
-        let networks = interface
-            .scanForNetworksWithName_includeHidden_error(Some(&ns_ssid), true)
-            .map_err(|err| nserror_message(&err))?;
-
-        let network = networks
-            .anyObject()
-            .ok_or_else(|| format!("Network '{ssid}' was not found in range."))?;
-
         let ns_password = password.map(NSString::from_str);
-        interface
-            .associateToNetwork_password_error(&network, ns_password.as_deref())
-            .map_err(|err| nserror_message(&err))?;
+        let mut last_error: Option<String> = None;
 
-        Ok(interface
-            .interfaceName()
-            .map(|name| name.to_string())
-            .unwrap_or_else(|| "Wi-Fi".to_string()))
+        for attempt in 1..=COREWLAN_MAX_ATTEMPTS {
+            let networks = match interface
+                .scanForNetworksWithName_includeHidden_error(Some(&ns_ssid), true)
+            {
+                Ok(networks) => networks,
+                Err(err) => {
+                    last_error = Some(nserror_message(&err));
+                    continue;
+                }
+            };
+
+            let Some(network) = networks.anyObject() else {
+                last_error = Some(format!("Network '{ssid}' was not found in range."));
+                continue;
+            };
+
+            if let Err(err) =
+                interface.associateToNetwork_password_error(&network, ns_password.as_deref())
+            {
+                last_error = Some(nserror_message(&err));
+                log::info!("CoreWLAN associate attempt {attempt} failed; retrying");
+                continue;
+            }
+
+            if wait_until_connected(&interface, ssid) {
+                log::info!("CoreWLAN connected on attempt {attempt}");
+                return Ok(interface
+                    .interfaceName()
+                    .map(|name| name.to_string())
+                    .unwrap_or_else(|| "Wi-Fi".to_string()));
+            }
+
+            last_error = Some(format!(
+                "Associated with '{ssid}' but the connection did not come up."
+            ));
+            log::info!("CoreWLAN associate attempt {attempt} did not connect; retrying");
+        }
+
+        Err(last_error
+            .unwrap_or_else(|| format!("Could not connect to '{ssid}' via CoreWLAN.")))
     }
+}
+
+/// Poll the interface's current SSID until it matches `ssid` or the timeout
+/// elapses. Returns `true` once connected.
+#[cfg(target_os = "macos")]
+fn wait_until_connected(interface: &CWInterface, ssid: &str) -> bool {
+    let mut waited = Duration::ZERO;
+    loop {
+        if current_ssid(interface).as_deref() == Some(ssid) {
+            return true;
+        }
+        if waited >= COREWLAN_VERIFY_TIMEOUT {
+            return false;
+        }
+        std::thread::sleep(COREWLAN_VERIFY_INTERVAL);
+        waited += COREWLAN_VERIFY_INTERVAL;
+    }
+}
+
+/// The SSID the interface is currently associated with, if any.
+#[cfg(target_os = "macos")]
+fn current_ssid(interface: &CWInterface) -> Option<String> {
+    unsafe { interface.ssid().map(|name| name.to_string()) }
 }
 
 #[cfg(target_os = "macos")]

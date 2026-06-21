@@ -39,6 +39,7 @@ fn join_wifi(request: JoinWifiRequest) -> Result<JoinWifiResponse, ErrorResponse
             (interface, "networksetup")
         }
     };
+    log::info!("Joined '{ssid}' via {method} on {interface}");
 
     Ok(JoinWifiResponse {
         interface,
