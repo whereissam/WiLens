@@ -78,8 +78,19 @@ bun run release:dmg
   `networksetup` tool, which shows a macOS administrator approval prompt.
 - All permission prompts are controlled by macOS, not by the app UI.
 
+## Security & Privacy
+
+WiLens runs entirely on your Mac — no servers, no accounts, no tracking, and no
+network calls of its own. Camera images, network names, and passwords never leave
+your computer. See [SECURITY.md](SECURITY.md) for the full breakdown and how to
+verify it yourself.
+
 ## Project Docs
 
 - [Product scope and architecture](docs/product-scope.md)
 - [Usage guide](docs/usage.md)
 - [Implementation TODO](docs/todo.md)
+
+## License
+
+[MIT](LICENSE) © whereissam
