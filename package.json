@@ -14,10 +14,10 @@
   },
   "dependencies": {
     "@tauri-apps/api": "^2.11.1",
-    "@zxing/browser": "^0.1.5"
+    "@zxing/browser": "^0.2.0"
   },
   "devDependencies": {
-    "typescript": "^5.9.3",
+    "typescript": "^6",
     "vite": "^8",
     "vitest": "^4.1.9"
   },
