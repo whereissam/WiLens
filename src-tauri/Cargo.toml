@@ -10,6 +10,15 @@ rust-version = "1.77.2"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+# Optimize the release build for size — this is a small utility, not a
+# compute-bound app, so trading a little speed for a much smaller binary is worth it.
+[profile.release]
+opt-level = "z"   # optimize aggressively for size
+lto = true        # link-time optimization across crates
+codegen-units = 1 # let the optimizer see the whole crate at once
+panic = "abort"   # drop unwinding tables
+strip = true      # strip symbols from the binary
+
 [lib]
 name = "wilens_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
