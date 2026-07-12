@@ -2,22 +2,42 @@
 import MainLayout from "../layouts/MainLayout.astro";
 
 const githubHref = "https://github.com/whereissam/WiLens";
+const downloadHref = `${githubHref}/releases/latest/download/WiLens.dmg`;
+
+const featureCards = [
+  {
+    title: "Scans Wi-Fi QR codes",
+    text: "Point your Mac camera at a printed code, shared screen, router label, or onboarding poster.",
+  },
+  {
+    title: "Shows the network first",
+    text: "Review the SSID, security type, and hidden password state before joining anything.",
+  },
+  {
+    title: "Keeps details local",
+    text: "The scan, decode, and join flow happens on your Mac. Nothing is uploaded to a server.",
+  },
+  {
+    title: "Built for macOS",
+    text: "A focused desktop utility with a small footprint and a direct path from camera to connection.",
+  },
+];
 ---
 
 <MainLayout
-  title="WiLens | Join Wi-Fi with one scan"
-  description="A macOS utility that scans Wi-Fi QR codes, previews the network, and gets your Mac online in seconds."
+  title="WiLens | Wi-Fi QR scanner for macOS"
+  description="WiLens scans Wi-Fi QR codes on macOS, previews the network, and joins in seconds without cloud upload."
 >
-  <main class="page-shell" id="top">
-    <nav class="navbar">
+  <main class="site-shell" id="top">
+    <nav class="navbar" aria-label="Primary navigation">
       <a class="brand" href="#top" aria-label="WiLens home">
-        <img src="/wilen-logo.png" alt="" />
+        <img src="/app-icon.png" alt="" />
         <span>WiLens</span>
       </a>
 
       <div class="nav-links">
+        <a href="#workflow">Workflow</a>
         <a href="#features">Features</a>
-        <a href="#how-it-works">How it works</a>
         <a href={githubHref}>GitHub</a>
         <a href="#download">Download</a>
         <button
@@ -38,238 +58,121 @@ const githubHref = "https://github.com/whereissam/WiLens";
       </div>
     </nav>
 
-    <section class="hero">
+    <section class="hero" aria-labelledby="hero-title">
       <div class="hero-copy">
-        <p class="hero-badge">macOS utility · local-first</p>
-        <h1>Join Wi-Fi with one scan.</h1>
+        <!-- <div class="hero-mark" aria-hidden="true">
+          <img src="/app-icon.png" alt="" />
+        </div> -->
+        <p class="eyebrow">macOS Wi-Fi QR scanner</p>
+        <h1 id="hero-title">Join the network in the room.</h1>
         <p class="hero-text">
-          WiLens lets your Mac join Wi-Fi from a QR code in seconds. No typing
-          long passwords, no awkward setup path, no friction when networks are
-          shared in the real world.
+          WiLens turns the Wi-Fi QR codes people already share into a one-scan
+          connection flow for your Mac.
         </p>
 
         <div class="hero-actions">
-          <a class="button button-primary" href={`${githubHref}/releases/latest/download/WiLens.dmg`}>
-            Download for macOS
-          </a>
-          <a class="button button-secondary" href={githubHref}>View on GitHub</a>
+          <a class="button button-primary" href={downloadHref}>Download for macOS</a>
+          <a class="button button-secondary" href={githubHref}>View source</a>
         </div>
 
-        <p class="hero-note">Built for Apple Silicon. Local-first. No cloud.</p>
-
-        <div class="proof-row" aria-label="Product highlights">
-          <span>Apple Silicon</span>
-          <span>Instant QR detection</span>
+        <div class="hero-facts" aria-label="Product highlights">
           <span>No cloud upload</span>
+          <span>Apple Silicon</span>
+          <span>Open source</span>
         </div>
       </div>
 
-      <div class="hero-visual" aria-hidden="true">
-        <div class="glow glow-cyan"></div>
-        <div class="glow glow-violet"></div>
-        <div class="glow glow-gold"></div>
-
-        <div class="product-window">
-          <div class="window-chrome">
-            <span></span>
-            <span></span>
-            <span></span>
-          </div>
-
-          <div class="window-body">
-            <div class="camera-stage">
-              <div class="camera-noise"></div>
-              <div class="scan-target"></div>
-              <div class="scan-line"></div>
-              <div class="camera-chip">
-                <div class="chip-state chip-state-scan">Scanning for QR signal...</div>
-                <div class="chip-state chip-state-detect">Network detected.</div>
-                <div class="chip-state chip-state-connect">Connected successfully.</div>
-              </div>
-            </div>
-
-            <aside class="network-panel">
-              <div class="panel-state panel-state-scan">
-                <p class="panel-kicker">Scanning</p>
-                <h2 class="network-name">Waiting...</h2>
-                <dl>
-                  <div class="meta-card">
-                    <dt>Security</dt>
-                    <dd>Detecting</dd>
-                  </div>
-                  <div class="meta-card">
-                    <dt>Password</dt>
-                    <dd>Reading</dd>
-                  </div>
-                </dl>
-                <button class="join-pill join-pill-neutral" type="button">Scanning...</button>
-              </div>
-
-              <div class="panel-state panel-state-detect">
-                <p class="panel-kicker">Detected network</p>
-                <h2 class="network-name">Cafe_WiFi</h2>
-                <dl>
-                  <div class="meta-card">
-                    <dt>Security</dt>
-                    <dd>WPA2</dd>
-                  </div>
-                  <div class="meta-card">
-                    <dt>Password</dt>
-                    <dd>Hidden</dd>
-                  </div>
-                </dl>
-                <button class="join-pill join-pill-detect" type="button">Join network</button>
-              </div>
-
-              <div class="panel-state panel-state-connect">
-                <p class="panel-kicker">Connected</p>
-                <h2 class="network-name">Cafe_WiFi</h2>
-                <dl>
-                  <div class="meta-card">
-                    <dt>Security</dt>
-                    <dd>WPA2</dd>
-                  </div>
-                  <div class="meta-card">
-                    <dt>Password</dt>
-                    <dd>Saved</dd>
-                  </div>
-                </dl>
-                <button class="join-pill join-pill-connect" type="button">Connected</button>
-              </div>
-            </aside>
-          </div>
+      <div class="hero-visual">
+        <div class="screenshot-stage">
+          <img src="/screenshot.png" alt="WiLens macOS app scanning a Wi-Fi QR code" />
+        </div>
+        <div class="floating-card floating-card-top" aria-hidden="true">
+          <span class="status-dot"></span>
+          QR detected
+        </div>
+        <div class="floating-card floating-card-bottom" aria-hidden="true">
+          <strong>Cafe_WiFi</strong>
+          <span>Ready to join</span>
         </div>
       </div>
     </section>
 
-    <section class="trust-strip" aria-label="Trust">
-      <span>Private by default</span>
-      <span>Open source</span>
-      <span>Made for macOS</span>
-      <span>Lightweight</span>
-      <span>Fast setup</span>
-    </section>
-
-    <section class="steps" id="how-it-works">
-      <div class="section-head">
-        <p class="eyebrow">How it works</p>
-        <h2>Search, detect, connect.</h2>
+    <section class="workflow" id="workflow" aria-labelledby="workflow-title">
+      <div class="section-intro">
+        <p class="eyebrow">Workflow</p>
+        <h2 id="workflow-title">A short path from camera to Wi-Fi.</h2>
       </div>
 
-      <div class="steps-grid">
-        <article class="step-card">
-          <p class="step-number">01</p>
-          <h3>Scan</h3>
-          <p>Open WiLens and point your camera at a Wi-Fi QR code.</p>
-          <div class="step-visual step-visual-scan"></div>
+      <div class="workflow-grid">
+        <article>
+          <span>01</span>
+          <h3>Point</h3>
+          <p>Open WiLens and aim at any standard Wi-Fi QR code.</p>
         </article>
-
-        <article class="step-card">
-          <p class="step-number">02</p>
-          <h3>Detect</h3>
-          <p>WiLens reads the SSID, security type, and password instantly.</p>
-          <div class="step-visual step-visual-detect"></div>
+        <article>
+          <span>02</span>
+          <h3>Confirm</h3>
+          <p>Check the detected network before your Mac joins it.</p>
         </article>
-
-        <article class="step-card">
-          <p class="step-number">03</p>
+        <article>
+          <span>03</span>
           <h3>Connect</h3>
-          <p>Confirm once and WiLens joins quietly — no admin password needed.</p>
-          <div class="step-visual step-visual-connect"></div>
+          <p>Join without typing a long password by hand.</p>
         </article>
       </div>
     </section>
 
-    <section class="showcase">
-      <div class="section-head">
-        <p class="eyebrow">Product showcase</p>
-        <h2>Designed for the fastest path to online.</h2>
+    <section class="product-band" aria-label="Product screenshot">
+      <div>
+        <p class="eyebrow">Native utility</p>
+        <h2>Made for the moments when Wi-Fi is shared out loud, on paper, or on a wall.</h2>
       </div>
-
-      <div class="showcase-frame">
-        <div class="showcase-copy">
-          <p>
-            A focused utility that does one thing well: turn a Wi-Fi QR code
-            into an instant connection on your Mac.
-          </p>
-        </div>
-
-        <div class="showcase-window">
-          <img
-            class="showcase-realshot"
-            src="/screenshot.png"
-            alt="Real WiLens app screenshot"
-          />
-        </div>
-      </div>
+      <img src="/app-icon.png" alt="" aria-hidden="true" />
     </section>
 
-    <section class="features" id="features">
-      <div class="section-head">
+    <section class="features" id="features" aria-labelledby="features-title">
+      <div class="section-intro">
         <p class="eyebrow">Features</p>
-        <h2>Focused by design.</h2>
+        <h2 id="features-title">Small surface, practical defaults.</h2>
       </div>
 
       <div class="feature-grid">
-        <article class="feature-card feature-card-wide">
-          <h3>Local-first</h3>
-          <p>Everything happens on your device. Wi-Fi details are not uploaded anywhere.</p>
-        </article>
-
-        <article class="feature-card">
-          <h3>Fast QR recognition</h3>
-          <p>Optimized for quick scan and decode, with a direct path to confirmation.</p>
-        </article>
-
-        <article class="feature-card feature-card-tall">
-          <h3>Made for macOS</h3>
-          <p>Small, lightweight, and tuned for the way a Mac utility should feel.</p>
-        </article>
-
-        <article class="feature-card">
-          <h3>No password typing</h3>
-          <p>Avoid manual entry when the key is long, awkward, or shared on paper.</p>
-        </article>
-
-        <article class="feature-card">
-          <h3>Onboarding-friendly</h3>
-          <p>Useful for offices, events, guest Wi-Fi, labs, studios, and cafes.</p>
-        </article>
-
-        <article class="feature-card">
-          <h3>No admin prompt</h3>
-          <p>Joins via CoreWLAN without an admin password. macOS asks once for Location — required by the system to scan Wi-Fi, never used to track you.</p>
-        </article>
+        {featureCards.map((feature) => (
+          <article class="feature-card">
+            <h3>{feature.title}</h3>
+            <p>{feature.text}</p>
+          </article>
+        ))}
       </div>
     </section>
 
-    <section class="final-cta" id="download">
-      <div class="cta-halo"></div>
-      <p class="eyebrow">Download</p>
-      <h2>Get online in one scan.</h2>
+    <section class="privacy-panel">
+      <div>
+        <p class="eyebrow">Privacy</p>
+        <h2>Camera in. Wi-Fi out. No account in the middle.</h2>
+      </div>
       <p>
-        A faster, cleaner way to connect your Mac to Wi-Fi with a QR code.
+        WiLens is local-first and open source, so the QR contents stay on your
+        device. macOS may ask for camera and Wi-Fi related permissions because
+        the app scans codes and joins networks.
       </p>
+    </section>
 
-      <div class="cta-buttons">
-        <a class="button button-primary" href={`${githubHref}/releases/latest/download/WiLens.dmg`}>
-          Download for macOS
-        </a>
+    <section class="download" id="download" aria-labelledby="download-title">
+      <img src="/app-icon.png" alt="" aria-hidden="true" />
+      <p class="eyebrow">Download</p>
+      <h2 id="download-title">Bring QR Wi-Fi joining to your Mac.</h2>
+      <div class="hero-actions">
+        <a class="button button-primary" href={downloadHref}>Download for macOS</a>
         <a class="button button-secondary" href={githubHref}>GitHub</a>
       </div>
     </section>
 
-    <footer class="footer" id="footer">
-      <div class="footer-brand">
-        <div>
-          <strong>WiLens</strong>
-          <p>From QR code to connection in seconds.</p>
-        </div>
-      </div>
-
+    <footer class="footer">
+      <p>WiLens</p>
       <div class="footer-links">
+        <a href="#workflow">Workflow</a>
         <a href="#features">Features</a>
-        <a href="#how-it-works">How it works</a>
         <a href="#download">Download</a>
       </div>
     </footer>

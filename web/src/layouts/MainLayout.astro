@@ -22,18 +22,15 @@ const {
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Instrument+Sans:wght@400;500;600&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700;9..144,800&family=Plus+Jakarta+Sans:wght@500;600;700;800;900&display=swap"
       rel="stylesheet"
     />
-    <link rel="icon" href="/wilen-icon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/app-icon.png" type="image/png" />
     <script is:inline>
       const storageKey = "wilens-theme";
       const root = document.documentElement;
-      const systemTheme = window.matchMedia("(prefers-color-scheme: light)").matches
-        ? "light"
-        : "dark";
       const savedTheme = localStorage.getItem(storageKey);
-      root.dataset.theme = savedTheme || systemTheme;
+      root.dataset.theme = savedTheme || "light";
     </script>
   </head>
   <body>
