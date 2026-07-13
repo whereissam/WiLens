@@ -27,47 +27,57 @@ const {
     />
     <link rel="icon" href="/app-icon.png" type="image/png" />
     <script is:inline>
-      const storageKey = "wilens-theme";
-      const root = document.documentElement;
-      let savedTheme = null;
+      (() => {
+        const storageKey = "wilens-theme";
+        const root = document.documentElement;
+        let savedTheme = null;
 
-      try {
-        savedTheme = localStorage.getItem(storageKey);
-      } catch {
-        savedTheme = null;
-      }
+        try {
+          savedTheme = localStorage.getItem(storageKey);
+        } catch {
+          savedTheme = null;
+        }
 
-      root.dataset.theme =
-        savedTheme === "dark" || savedTheme === "light"
-          ? savedTheme
-          : window.matchMedia("(prefers-color-scheme: dark)").matches
-            ? "dark"
-            : "light";
+        root.dataset.theme =
+          savedTheme === "dark" || savedTheme === "light"
+            ? savedTheme
+            : window.matchMedia("(prefers-color-scheme: dark)").matches
+              ? "dark"
+              : "light";
+      })();
     </script>
   </head>
   <body>
     <slot />
     <script is:inline>
-      const storageKey = "wilens-theme";
-      const root = document.documentElement;
-      const syncThemeToggle = () => {
-        document.querySelectorAll("[data-theme-toggle]").forEach((button) => {
-          const isLight = root.dataset.theme === "light";
-          button.setAttribute("aria-pressed", String(isLight));
-          button.setAttribute("aria-label", isLight ? "Switch to dark mode" : "Switch to light mode");
-          const icon = button.querySelector("[data-theme-icon]");
-          if (icon) {
-            icon.innerHTML = isLight
-              ? '<path d="M20 15.2A8.2 8.2 0 0 1 8.8 4a8.7 8.7 0 1 0 11.2 11.2Z" fill="currentColor"></path>'
-              : '<circle cx="12" cy="12" r="4.2" fill="currentColor"></circle><path d="M12 2.5v2.4M12 19.1v2.4M21.5 12h-2.4M4.9 12H2.5M18.7 5.3l-1.7 1.7M7 17l-1.7 1.7M18.7 18.7 17 17M7 7 5.3 5.3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>';
+      (() => {
+        const storageKey = "wilens-theme";
+        const root = document.documentElement;
+        const syncThemeToggle = () => {
+          document.querySelectorAll("[data-theme-toggle]").forEach((button) => {
+            const isLight = root.dataset.theme === "light";
+            button.setAttribute("aria-pressed", String(!isLight));
+            button.setAttribute("aria-label", isLight ? "Switch to dark mode" : "Switch to light mode");
+            const icon = button.querySelector("[data-theme-icon]");
+            if (icon) {
+              icon.innerHTML = isLight
+                ? '<path d="M20 15.2A8.2 8.2 0 0 1 8.8 4a8.7 8.7 0 1 0 11.2 11.2Z" fill="currentColor"></path>'
+                : '<circle cx="12" cy="12" r="4.2" fill="currentColor"></circle><path d="M12 2.5v2.4M12 19.1v2.4M21.5 12h-2.4M4.9 12H2.5M18.7 5.3l-1.7 1.7M7 17l-1.7 1.7M18.7 18.7 17 17M7 7 5.3 5.3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>';
+            }
+          });
+        };
+
+        syncThemeToggle();
+
+        document.addEventListener("click", (event) => {
+          const button = event.target instanceof Element
+            ? event.target.closest("[data-theme-toggle]")
+            : null;
+
+          if (!button) {
+            return;
           }
-        });
-      };
 
-      syncThemeToggle();
-
-      document.querySelectorAll("[data-theme-toggle]").forEach((button) => {
-        button.addEventListener("click", () => {
           root.dataset.theme = root.dataset.theme === "light" ? "dark" : "light";
           try {
             localStorage.setItem(storageKey, root.dataset.theme);
@@ -76,7 +86,7 @@ const {
           }
           syncThemeToggle();
         });
-      });
+      })();
     </script>
   </body>
 </html>
