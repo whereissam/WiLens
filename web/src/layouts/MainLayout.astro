@@ -29,8 +29,20 @@ const {
     <script is:inline>
       const storageKey = "wilens-theme";
       const root = document.documentElement;
-      const savedTheme = localStorage.getItem(storageKey);
-      root.dataset.theme = savedTheme || "light";
+      let savedTheme = null;
+
+      try {
+        savedTheme = localStorage.getItem(storageKey);
+      } catch {
+        savedTheme = null;
+      }
+
+      root.dataset.theme =
+        savedTheme === "dark" || savedTheme === "light"
+          ? savedTheme
+          : window.matchMedia("(prefers-color-scheme: dark)").matches
+            ? "dark"
+            : "light";
     </script>
   </head>
   <body>
@@ -57,7 +69,11 @@ const {
       document.querySelectorAll("[data-theme-toggle]").forEach((button) => {
         button.addEventListener("click", () => {
           root.dataset.theme = root.dataset.theme === "light" ? "dark" : "light";
-          localStorage.setItem(storageKey, root.dataset.theme);
+          try {
+            localStorage.setItem(storageKey, root.dataset.theme);
+          } catch {
+            // Storage can be unavailable in restricted browser contexts.
+          }
           syncThemeToggle();
         });
       });

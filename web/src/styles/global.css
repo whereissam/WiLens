@@ -14,6 +14,11 @@
   --gold: #f3cf67;
   --green-black: #0e2b22;
   --shadow: 0 28px 80px rgba(60, 105, 154, 0.18);
+  --wash-mint: rgba(169, 240, 231, 0.54);
+  --wash-blue: rgba(86, 169, 242, 0.28);
+  --wash-cream: rgba(255, 246, 207, 0.8);
+  --grid-line: rgba(44, 111, 168, 0.07);
+  --grid-mask: rgba(0, 0, 0, 0.65);
 }
 
 :root[data-theme="dark"] {
@@ -32,6 +37,11 @@
   --gold: #f0d36d;
   --green-black: #dff8ec;
   --shadow: 0 30px 90px rgba(0, 0, 0, 0.34);
+  --wash-mint: rgba(12, 48, 55, 0.62);
+  --wash-blue: rgba(38, 111, 172, 0.18);
+  --wash-cream: rgba(30, 38, 34, 0.62);
+  --grid-line: rgba(164, 210, 248, 0.06);
+  --grid-mask: rgba(0, 0, 0, 0.5);
 }
 
 * {
@@ -48,9 +58,9 @@ body {
   color: var(--ink);
   font-family: "Plus Jakarta Sans", sans-serif;
   background:
-    linear-gradient(115deg, rgba(169, 240, 231, 0.54), transparent 34%),
-    radial-gradient(circle at 83% 8%, rgba(86, 169, 242, 0.28), transparent 28%),
-    radial-gradient(circle at 8% 58%, rgba(255, 246, 207, 0.8), transparent 26%),
+    linear-gradient(115deg, var(--wash-mint), transparent 34%),
+    radial-gradient(circle at 83% 8%, var(--wash-blue), transparent 28%),
+    radial-gradient(circle at 8% 58%, var(--wash-cream), transparent 26%),
     var(--bg);
 }
 
@@ -61,10 +71,10 @@ body::before {
   z-index: -1;
   pointer-events: none;
   background-image:
-    linear-gradient(rgba(44, 111, 168, 0.07) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(44, 111, 168, 0.07) 1px, transparent 1px);
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
   background-size: 56px 56px;
-  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.65), transparent 72%);
+  mask-image: linear-gradient(to bottom, var(--grid-mask), transparent 72%);
 }
 
 a {
