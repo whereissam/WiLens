@@ -25,7 +25,19 @@ struct ErrorResponse {
 }
 
 #[tauri::command]
-fn join_wifi(request: JoinWifiRequest) -> Result<JoinWifiResponse, ErrorResponse> {
+async fn join_wifi(request: JoinWifiRequest) -> Result<JoinWifiResponse, ErrorResponse> {
+    // CoreWLAN scans, association, verification polling, and the fallback
+    // process invocation can all block for seconds. Run them on Tauri's
+    // dedicated blocking pool so the macOS event loop keeps servicing the
+    // window instead of showing the spinning beach ball.
+    tauri::async_runtime::spawn_blocking(move || join_wifi_blocking(request))
+        .await
+        .map_err(|error| ErrorResponse {
+            message: format!("Wi-Fi join task ended unexpectedly: {error}"),
+        })?
+}
+
+fn join_wifi_blocking(request: JoinWifiRequest) -> Result<JoinWifiResponse, ErrorResponse> {
     let ssid = sanitize_required(&request.ssid, "SSID")?;
     let security = normalize_security(&request.security)?;
     let password = sanitize_optional(request.password.as_deref(), "Password")?;
