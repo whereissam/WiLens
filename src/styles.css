@@ -129,6 +129,37 @@ h1 {
   background: linear-gradient(135deg, #d4d086 0%, #f1d77a 100%);
 }
 
+/* Joining: keep the button readable (not faded like :disabled) and spin. */
+.button.is-busy {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  cursor: progress;
+  opacity: 1;
+}
+
+.button.is-busy::before {
+  content: "";
+  width: 0.9em;
+  height: 0.9em;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spin 700ms linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .button.is-busy::before {
+    animation-duration: 2s;
+  }
+}
+
 .button-secondary {
   color: #ecf3ef;
   background: rgba(255, 255, 255, 0.08);

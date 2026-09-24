@@ -1,16 +1,17 @@
-use std::process::Command;
-#[cfg(target_os = "macos")]
-use std::time::Duration;
+use std::process::{Command, Stdio};
+use std::time::{Duration, Instant};
 
 #[cfg(target_os = "macos")]
-use objc2_core_wlan::{CWInterface, CWWiFiClient};
+use objc2_core_location::{CLAuthorizationStatus, CLLocationManager};
+#[cfg(target_os = "macos")]
+use objc2_core_wlan::{CWInterface, CWNetwork, CWWiFiClient};
 #[cfg(target_os = "macos")]
 use objc2_foundation::{NSError, NSString};
 
-/// Maximum number of scan + associate attempts before giving up on CoreWLAN.
-/// `associateToNetwork` can report success before the link is actually up; the
-/// second attempt is what reliably connects (the behavior users hit manually as
-/// a "double click"), so we retry automatically.
+/// Maximum number of associate attempts before giving up on CoreWLAN.
+/// `associateToNetwork` can report success before the link is actually up; a
+/// second associate is what reliably connects (the behavior users hit manually
+/// as a "double click"), so we retry automatically.
 #[cfg(target_os = "macos")]
 const COREWLAN_MAX_ATTEMPTS: u32 = 3;
 
@@ -23,10 +24,36 @@ const COREWLAN_VERIFY_TIMEOUT: Duration = Duration::from_millis(2500);
 #[cfg(target_os = "macos")]
 const COREWLAN_VERIFY_INTERVAL: Duration = Duration::from_millis(300);
 
+/// Upper bound on a `networksetup` invocation so a wedged process cannot leave
+/// the join hanging forever.
+const NETWORKSETUP_TIMEOUT: Duration = Duration::from_secs(30);
+
 #[derive(Debug)]
 pub struct HardwarePort {
     pub port: String,
     pub device: String,
+}
+
+/// Why a CoreWLAN join did not succeed, which decides whether the
+/// `networksetup` fallback is worth trying.
+#[derive(Debug)]
+pub enum CoreWlanError {
+    /// CoreWLAN could not attempt or finish the join (no interface, network not
+    /// visible — often missing Location permission — or the link never came
+    /// up). The fallback may still succeed.
+    Unavailable(String),
+    /// The network rejected the join (e.g. wrong password). The fallback would
+    /// only repeat the same failure, slowly.
+    Rejected(String),
+}
+
+/// Whether Location Services access has been refused. CoreWLAN needs it both to
+/// scan and to read the current SSID, so when it is refused the CoreWLAN path
+/// can only waste time.
+#[cfg(target_os = "macos")]
+pub fn location_denied() -> bool {
+    let status = unsafe { CLLocationManager::new().authorizationStatus() };
+    status == CLAuthorizationStatus::Denied || status == CLAuthorizationStatus::Restricted
 }
 
 /// Join a network via CoreWLAN as the logged-in user — no admin prompt.
@@ -35,84 +62,133 @@ pub struct HardwarePort {
 ///
 /// `associateToNetwork` may return `Ok` before the connection is established, so
 /// after each associate we poll the interface's current SSID and only report
-/// success once it actually matches the target. If it does not connect within
-/// the timeout we re-scan and try again, up to `COREWLAN_MAX_ATTEMPTS`.
+/// success once it actually matches the target. The scan result is reused
+/// across attempts: re-scanning costs seconds and can disrupt a link that is
+/// still coming up. Repeated associate errors (e.g. a wrong password) are
+/// reported as `Rejected` so the caller does not fall back.
 #[cfg(target_os = "macos")]
-pub fn join_via_corewlan(ssid: &str, password: Option<&str>) -> Result<String, String> {
+pub fn join_via_corewlan(
+    ssid: &str,
+    password: Option<&str>,
+    progress: &dyn Fn(&str),
+) -> Result<String, CoreWlanError> {
     unsafe {
         let client = CWWiFiClient::sharedWiFiClient();
         let interface = client
             .interface()
-            .ok_or_else(|| "No Wi-Fi interface available.".to_string())?;
+            .ok_or_else(|| CoreWlanError::Unavailable("No Wi-Fi interface available.".into()))?;
+        let interface_name = || {
+            interface
+                .interfaceName()
+                .map(|name| name.to_string())
+                .unwrap_or_else(|| "Wi-Fi".to_string())
+        };
 
-        let ns_ssid = NSString::from_str(ssid);
+        if current_ssid(&interface).as_deref() == Some(ssid) {
+            log::info!("Already connected to '{ssid}'");
+            return Ok(interface_name());
+        }
+
+        progress(&format!("Looking for '{ssid}'..."));
+        let network = find_network(&interface, ssid)?;
         let ns_password = password.map(NSString::from_str);
-        let mut last_error: Option<String> = None;
 
         for attempt in 1..=COREWLAN_MAX_ATTEMPTS {
-            let networks = match interface
-                .scanForNetworksWithName_includeHidden_error(Some(&ns_ssid), true)
-            {
-                Ok(networks) => networks,
-                Err(err) => {
-                    last_error = Some(nserror_message(&err));
-                    continue;
-                }
-            };
-
-            let Some(network) = networks.anyObject() else {
-                last_error = Some(format!("Network '{ssid}' was not found in range."));
-                continue;
-            };
+            progress(&if attempt == 1 {
+                format!("Connecting to '{ssid}'...")
+            } else {
+                format!("Connecting to '{ssid}' (attempt {attempt} of {COREWLAN_MAX_ATTEMPTS})...")
+            });
 
             if let Err(err) =
                 interface.associateToNetwork_password_error(&network, ns_password.as_deref())
             {
-                last_error = Some(nserror_message(&err));
-                log::info!("CoreWLAN associate attempt {attempt} failed; retrying");
-                continue;
+                // One retry covers a transient failure; a second error is
+                // almost always the network refusing us (wrong password).
+                if attempt == 1 {
+                    log::info!("CoreWLAN associate attempt 1 failed; retrying once");
+                    continue;
+                }
+                let hint = if password.is_some() {
+                    " Check that the password is correct."
+                } else {
+                    ""
+                };
+                return Err(CoreWlanError::Rejected(format!(
+                    "Could not join '{ssid}': {}.{hint}",
+                    nserror_message(&err)
+                )));
             }
 
             if wait_until_connected(&interface, ssid) {
                 log::info!("CoreWLAN connected on attempt {attempt}");
-                return Ok(interface
-                    .interfaceName()
-                    .map(|name| name.to_string())
-                    .unwrap_or_else(|| "Wi-Fi".to_string()));
+                return Ok(interface_name());
             }
 
-            last_error = Some(format!(
-                "Associated with '{ssid}' but the connection did not come up."
-            ));
             log::info!("CoreWLAN associate attempt {attempt} did not connect; retrying");
         }
 
-        Err(last_error
-            .unwrap_or_else(|| format!("Could not connect to '{ssid}' via CoreWLAN.")))
+        Err(CoreWlanError::Unavailable(format!(
+            "Associated with '{ssid}' but the connection did not come up."
+        )))
     }
+}
+
+/// Scan for `ssid`, retrying once because a scan can miss a network that is in
+/// range (or fail transiently while the radio is busy).
+#[cfg(target_os = "macos")]
+fn find_network(
+    interface: &CWInterface,
+    ssid: &str,
+) -> Result<objc2::rc::Retained<CWNetwork>, CoreWlanError> {
+    let ns_ssid = NSString::from_str(ssid);
+    let mut last_error = format!("Network '{ssid}' was not found in range.");
+
+    for _ in 0..2 {
+        match unsafe { interface.scanForNetworksWithName_includeHidden_error(Some(&ns_ssid), true) }
+        {
+            Ok(networks) => {
+                if let Some(network) = networks.anyObject() {
+                    return Ok(network);
+                }
+            }
+            Err(err) => last_error = nserror_message(&err),
+        }
+    }
+
+    Err(CoreWlanError::Unavailable(last_error))
 }
 
 /// Poll the interface's current SSID until it matches `ssid` or the timeout
 /// elapses. Returns `true` once connected.
 #[cfg(target_os = "macos")]
 fn wait_until_connected(interface: &CWInterface, ssid: &str) -> bool {
-    let mut waited = Duration::ZERO;
+    let deadline = Instant::now() + COREWLAN_VERIFY_TIMEOUT;
     loop {
         if current_ssid(interface).as_deref() == Some(ssid) {
             return true;
         }
-        if waited >= COREWLAN_VERIFY_TIMEOUT {
+        if Instant::now() >= deadline {
             return false;
         }
         std::thread::sleep(COREWLAN_VERIFY_INTERVAL);
-        waited += COREWLAN_VERIFY_INTERVAL;
     }
 }
 
-/// The SSID the interface is currently associated with, if any.
+/// The SSID the interface is currently associated with, if any. Returns `None`
+/// without Location permission even when connected.
 #[cfg(target_os = "macos")]
 fn current_ssid(interface: &CWInterface) -> Option<String> {
     unsafe { interface.ssid().map(|name| name.to_string()) }
+}
+
+/// The SSID of the default Wi-Fi interface, if CoreWLAN can report it.
+#[cfg(target_os = "macos")]
+pub fn default_interface_ssid() -> Option<String> {
+    unsafe {
+        let interface = CWWiFiClient::sharedWiFiClient().interface()?;
+        current_ssid(&interface)
+    }
 }
 
 #[cfg(target_os = "macos")]
@@ -121,8 +197,8 @@ fn nserror_message(error: &NSError) -> String {
     error.to_string()
 }
 
-/// Join a network using the legacy `networksetup` command. Requires admin
-/// authorization (macOS shows a prompt). Returns the interface name on success.
+/// Join a network using the legacy `networksetup` command. Returns the
+/// interface name on success.
 pub fn join_via_networksetup(
     ssid: &str,
     security: &str,
@@ -142,15 +218,19 @@ pub fn join_via_networksetup(
         args.push(value.to_string());
     }
 
-    let output = Command::new("/usr/sbin/networksetup")
-        .args(&args)
-        .output()
-        .map_err(|error| format!("Failed to run networksetup: {error}"))?;
+    let output = run_with_timeout(
+        Command::new("/usr/sbin/networksetup").args(&args),
+        NETWORKSETUP_TIMEOUT,
+    )?;
 
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-        let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
-        let details = if !stderr.is_empty() { stderr } else { stdout };
+    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let details = if !stderr.is_empty() { stderr } else { stdout };
+
+    // `-setairportnetwork` exits 0 even when the join fails; the failure is
+    // only reported as text ("Could not find network ...", "Failed to join
+    // network ...", "Error: -3900 ...").
+    if !output.status.success() || reports_failure(&details) {
         return Err(if details.is_empty() {
             "networksetup failed without an error message.".to_string()
         } else {
@@ -159,6 +239,48 @@ pub fn join_via_networksetup(
     }
 
     Ok(interface)
+}
+
+fn reports_failure(output: &str) -> bool {
+    let lower = output.to_ascii_lowercase();
+    ["could not", "failed", "error"]
+        .iter()
+        .any(|needle| lower.contains(needle))
+}
+
+/// Run a command to completion, killing it if it exceeds `timeout`.
+fn run_with_timeout(
+    command: &mut Command,
+    timeout: Duration,
+) -> Result<std::process::Output, String> {
+    let mut child = command
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|error| format!("Failed to run networksetup: {error}"))?;
+
+    let deadline = Instant::now() + timeout;
+    loop {
+        match child.try_wait() {
+            Ok(Some(_)) => break,
+            Ok(None) if Instant::now() < deadline => {
+                std::thread::sleep(Duration::from_millis(100));
+            }
+            Ok(None) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err(format!(
+                    "networksetup did not finish within {} seconds.",
+                    timeout.as_secs()
+                ));
+            }
+            Err(error) => return Err(format!("Failed to wait for networksetup: {error}")),
+        }
+    }
+
+    child
+        .wait_with_output()
+        .map_err(|error| format!("Failed to read networksetup output: {error}"))
 }
 
 pub fn detect_wifi_interface() -> Result<String, String> {
@@ -214,7 +336,16 @@ pub fn parse_hardware_ports(output: &str) -> Vec<HardwarePort> {
 
 #[cfg(test)]
 mod tests {
-    use super::parse_hardware_ports;
+    use super::{parse_hardware_ports, reports_failure};
+
+    #[test]
+    fn detects_networksetup_failure_text() {
+        assert!(reports_failure("Could not find network MyWifi."));
+        assert!(reports_failure(
+            "Failed to join network MyWifi.\nError: -3900  The operation couldn't be completed."
+        ));
+        assert!(!reports_failure(""));
+    }
 
     #[test]
     fn parses_networksetup_hardware_ports() {

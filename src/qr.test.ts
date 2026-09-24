@@ -24,6 +24,12 @@ describe("parseWifiQr", () => {
     expect(payload.security).toBe("WPA");
   });
 
+  it.each(["WPA2", "WPA3", "SAE", "sae"])("treats %s as WPA", (type) => {
+    const payload = parseWifiQr(`WIFI:T:${type};S:Net;P:pw;;`);
+
+    expect(payload.security).toBe("WPA");
+  });
+
   it("treats fields in any order", () => {
     const payload = parseWifiQr("WIFI:S:Net;P:pw;T:WPA;;");
 
