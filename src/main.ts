@@ -1,5 +1,5 @@
 import { BrowserMultiFormatReader, type IScannerControls } from "@zxing/browser";
-import { invoke } from "@tauri-apps/api/core";
+import { Channel, invoke } from "@tauri-apps/api/core";
 import "./styles.css";
 import { parseWifiQr, type WifiPayload } from "./qr";
 
@@ -91,6 +91,7 @@ let currentPayload: WifiPayload | null = null;
 let state: ScannerState = "idle";
 
 startButton.addEventListener("click", () => {
+  resetResult();
   void startScan();
 });
 
@@ -112,42 +113,40 @@ async function startScan(): Promise<void> {
     return;
   }
 
-  try {
-    const permissionProbe = await navigator.mediaDevices.getUserMedia({ video: true });
-    permissionProbe.getTracks().forEach((track) => track.stop());
-  } catch (error) {
-    setError(getErrorMessage(error, "Camera permission was denied."));
-    return;
-  }
-
+  // Claim the state before awaiting so a double-click cannot start a second
+  // scanner (which would leak the first one and leave the camera on).
   stopScan();
-  setStatus("Scanning for a Wi-Fi QR code...");
   state = "scanning";
+  setStatus("Scanning for a Wi-Fi QR code...");
   toggleControls();
 
   try {
-    controls = await reader.decodeFromVideoDevice(undefined, video, (result, error) => {
-      if (result) {
-        try {
-          const payload = parseWifiQr(result.getText());
-          currentPayload = payload;
-          state = "idle";
-          renderPayload(payload);
-          setStatus(`Ready to join '${payload.ssid}'.`);
-          stopScan();
-        } catch (parseError) {
-          setStatus(getErrorMessage(parseError, "QR code detected, but it is not a valid Wi-Fi payload."));
-        }
-
+    const scanControls = await reader.decodeFromVideoDevice(undefined, video, (result) => {
+      if (!result || state !== "scanning") {
         return;
       }
 
-      if (error && state === "scanning") {
-        setStatus("Scanning for a Wi-Fi QR code...");
+      try {
+        const payload = parseWifiQr(result.getText());
+        currentPayload = payload;
+        state = "idle";
+        stopScan();
+        renderPayload(payload);
+        setStatus(`Ready to join '${payload.ssid}'.`);
+      } catch (parseError) {
+        setStatus(getErrorMessage(parseError, "QR code detected, but it is not a valid Wi-Fi payload."));
       }
     });
+
+    // A code may have been decoded, or the scan cancelled, while the camera
+    // was still starting up.
+    if (state === "scanning") {
+      controls = scanControls;
+    } else {
+      scanControls.stop();
+    }
   } catch (error) {
-    setError(getErrorMessage(error, "Unable to start the scanner."));
+    setError(getCameraErrorMessage(error));
   }
 }
 
@@ -165,6 +164,13 @@ async function joinNetwork(): Promise<void> {
   setStatus(`Joining '${currentPayload.ssid}'...`);
   toggleControls();
 
+  const onProgress = new Channel<string>();
+  onProgress.onmessage = (message) => {
+    if (state === "joining") {
+      setStatus(message);
+    }
+  };
+
   try {
     const response = await invoke<JoinWifiResponse>("join_wifi", {
       request: {
@@ -172,6 +178,7 @@ async function joinNetwork(): Promise<void> {
         password: currentPayload.password,
         security: currentPayload.security,
       },
+      onProgress,
     });
 
     state = "joined";
@@ -198,6 +205,7 @@ async function copyPassword(): Promise<void> {
 }
 
 function resetResult(): void {
+  stopScan();
   currentPayload = null;
   state = "idle";
   ssidElement.textContent = "No network scanned yet";
@@ -229,10 +237,24 @@ function setError(message: string): void {
 }
 
 function toggleControls(): void {
-  startButton.disabled = state === "scanning" || state === "joining";
-  rescanButton.disabled = state === "scanning" || state === "joining";
-  joinButton.disabled = !currentPayload || state === "joining";
+  const busy = state === "scanning" || state === "joining";
+  startButton.disabled = busy;
+  rescanButton.disabled = busy;
+  joinButton.disabled = !currentPayload || busy;
   copyButton.disabled = !currentPayload?.password || state === "joining";
+
+  const joining = state === "joining";
+  joinButton.classList.toggle("is-busy", joining);
+  joinButton.setAttribute("aria-busy", String(joining));
+  joinButton.textContent = joining ? "Joining..." : "Join network";
+}
+
+function getCameraErrorMessage(error: unknown): string {
+  if (error instanceof DOMException && error.name === "NotAllowedError") {
+    return "Camera permission was denied.";
+  }
+
+  return getErrorMessage(error, "Unable to start the scanner.");
 }
 
 function getErrorMessage(error: unknown, fallback: string): string {

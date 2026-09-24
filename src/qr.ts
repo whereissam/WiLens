@@ -61,8 +61,13 @@ export function parseWifiQr(raw: string): WifiPayload {
 function normalizeSecurity(value: string): WifiSecurity {
   const normalized = value.toUpperCase();
 
-  if (normalized === "WPA" || normalized === "WEP") {
+  if (normalized === "WEP") {
     return normalized;
+  }
+
+  // WPA2/WPA3 generators (Android emits "SAE" for WPA3) all join the same way.
+  if (["WPA", "WPA2", "WPA3", "SAE"].includes(normalized)) {
+    return "WPA";
   }
 
   if (normalized === "NOPASS" || normalized === "") {
