@@ -68,6 +68,25 @@ page links to) in one step:
 bun run release:dmg
 ```
 
+Build the Windows installer (`WiLens-setup.exe`) from a Mac by
+cross-compiling. One-time setup:
+
+```bash
+brew install nsis llvm lld
+cargo install --locked cargo-xwin
+rustup target add x86_64-pc-windows-msvc
+```
+
+Then:
+
+```bash
+bun run release:win
+```
+
+The first run downloads the Windows SDK/CRT libraries. This is Tauri's
+experimental cross-compile path; release builds come from the `Windows build`
+GitHub workflow, which uses a real Windows runner.
+
 ## Permissions
 
 - **Camera** — to scan the QR code.
