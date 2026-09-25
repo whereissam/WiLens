@@ -11,6 +11,16 @@ interface JoinWifiResponse {
 }
 
 const app = document.querySelector<HTMLDivElement>("#app");
+const isWindows = navigator.userAgent.includes("Windows");
+
+const systemNote = isWindows
+  ? `WiLens saves a Wi-Fi profile for your Windows account and connects with
+     it — no administrator prompt. On Windows 11, turning on Location access
+     for desktop apps lets WiLens confirm the connection.`
+  : `macOS requires Location access to scan for Wi-Fi networks, so it asks
+     the first time — WiLens never tracks your location. If the quick join
+     can't connect, it falls back to <code>networksetup</code>, which may
+     show a macOS administrator prompt.`;
 
 if (!app) {
   throw new Error("App root element was not found.");
@@ -21,7 +31,7 @@ app.innerHTML = `
     <section class="hero">
       <div class="hero-badge">
         <img src="/wilen-logo.png" alt="" class="hero-logo" />
-        <p class="eyebrow">macOS Wi-Fi QR utility</p>
+        <p class="eyebrow">${isWindows ? "Windows" : "macOS"} Wi-Fi QR utility</p>
       </div>
       <h1>Point your camera at a Wi-Fi QR code.</h1>
       <p class="lede">
@@ -58,12 +68,7 @@ app.innerHTML = `
             <dd id="hidden">-</dd>
           </div>
         </dl>
-        <p class="system-note">
-          macOS requires Location access to scan for Wi-Fi networks, so it asks
-          the first time — WiLens never tracks your location. If the quick join
-          can't connect, it falls back to <code>networksetup</code>, which may
-          show a macOS administrator prompt.
-        </p>
+        <p class="system-note">${systemNote}</p>
         <div class="result-actions">
           <button id="join-network" class="button button-primary" disabled>Join network</button>
           <button id="copy-password" class="button button-secondary" disabled>Copy password</button>
@@ -177,6 +182,7 @@ async function joinNetwork(): Promise<void> {
         ssid: currentPayload.ssid,
         password: currentPayload.password,
         security: currentPayload.security,
+        hidden: currentPayload.hidden,
       },
       onProgress,
     });

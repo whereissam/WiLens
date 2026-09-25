@@ -1,7 +1,10 @@
 use serde::{Deserialize, Serialize};
 use tauri::ipc::Channel;
-use wifi::CoreWlanError;
 
+mod netsh;
+#[cfg(any(target_os = "macos", windows))]
+mod process;
+#[cfg(target_os = "macos")]
 mod wifi;
 
 #[derive(Debug, Deserialize)]
@@ -10,6 +13,8 @@ struct JoinWifiRequest {
     ssid: String,
     password: Option<String>,
     security: String,
+    #[serde(default)]
+    hidden: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -31,10 +36,9 @@ async fn join_wifi(
     request: JoinWifiRequest,
     on_progress: Channel<String>,
 ) -> Result<JoinWifiResponse, ErrorResponse> {
-    // CoreWLAN scans, association, verification polling, and the fallback
-    // process invocation can all block for seconds. Run them on Tauri's
-    // dedicated blocking pool so the macOS event loop keeps servicing the
-    // window instead of showing the spinning beach ball.
+    // Scans, association, verification polling, and external processes can
+    // all block for seconds. Run them on Tauri's dedicated blocking pool so the
+    // event loop keeps servicing the window instead of freezing it.
     tauri::async_runtime::spawn_blocking(move || {
         let progress = |message: &str| {
             let _ = on_progress.send(message.to_string());
@@ -47,6 +51,15 @@ async fn join_wifi(
     })?
 }
 
+/// Outcome of a platform join.
+struct Joined {
+    interface: String,
+    method: &'static str,
+    /// False when the OS accepted the join but could not confirm the
+    /// connection came up.
+    verified: bool,
+}
+
 fn join_wifi_blocking(
     request: JoinWifiRequest,
     progress: &dyn Fn(&str),
@@ -55,27 +68,70 @@ fn join_wifi_blocking(
     let security = normalize_security(&request.security)?;
     let password = sanitize_optional(request.password.as_deref(), "Password")?;
 
+    let joined = join_platform(
+        &ssid,
+        &security,
+        password.as_deref(),
+        request.hidden,
+        progress,
+    )?;
+    log::info!(
+        "Joined '{ssid}' via {} on {} (verified: {})",
+        joined.method,
+        joined.interface,
+        joined.verified
+    );
+
+    let message = if joined.verified {
+        format!("Joined '{ssid}' successfully.")
+    } else {
+        format!(
+            "Asked the system to join '{ssid}', but it could not confirm the connection. Check the Wi-Fi icon to be sure."
+        )
+    };
+
+    Ok(JoinWifiResponse {
+        interface: joined.interface,
+        message,
+        method: joined.method.to_string(),
+    })
+}
+
+#[cfg(target_os = "macos")]
+fn join_platform(
+    ssid: &str,
+    security: &str,
+    password: Option<&str>,
+    _hidden: bool,
+    progress: &dyn Fn(&str),
+) -> Result<Joined, ErrorResponse> {
+    use wifi::CoreWlanError;
+
     let corewlan_result = if wifi::location_denied() {
         Err(CoreWlanError::Unavailable(
             "Location access is denied, so CoreWLAN cannot scan.".to_string(),
         ))
     } else {
-        wifi::join_via_corewlan(&ssid, password.as_deref(), progress)
+        wifi::join_via_corewlan(ssid, password, progress)
     };
 
-    let (interface, method) = match corewlan_result {
-        Ok(interface) => (interface, "corewlan"),
+    match corewlan_result {
+        Ok(interface) => Ok(Joined {
+            interface,
+            method: "corewlan",
+            verified: true,
+        }),
         // The network itself refused the join; networksetup would only repeat
         // the same failure after another long wait.
-        Err(CoreWlanError::Rejected(message)) => return Err(ErrorResponse { message }),
+        Err(CoreWlanError::Rejected(message)) => Err(ErrorResponse { message }),
         Err(CoreWlanError::Unavailable(corewlan_error)) => {
             log::warn!("CoreWLAN join failed, falling back to networksetup: {corewlan_error}");
-            ensure_not_flag(&ssid, "SSID")?;
-            if let Some(password) = password.as_deref() {
+            ensure_not_flag(ssid, "SSID")?;
+            if let Some(password) = password {
                 ensure_not_flag(password, "Password")?;
             }
             progress("Trying the system fallback...");
-            let interface = wifi::join_via_networksetup(&ssid, &security, password.as_deref())
+            let interface = wifi::join_via_networksetup(ssid, security, password)
                 .map_err(|message| ErrorResponse { message })?;
             // The SSID is unreadable without Location access; only a mismatch
             // is conclusive.
@@ -88,15 +144,42 @@ fn join_wifi_blocking(
                     });
                 }
             }
-            (interface, "networksetup")
+            Ok(Joined {
+                interface,
+                method: "networksetup",
+                verified: true,
+            })
         }
-    };
-    log::info!("Joined '{ssid}' via {method} on {interface}");
+    }
+}
 
-    Ok(JoinWifiResponse {
-        interface,
-        message: format!("Joined '{ssid}' successfully."),
-        method: method.to_string(),
+#[cfg(windows)]
+fn join_platform(
+    ssid: &str,
+    security: &str,
+    password: Option<&str>,
+    hidden: bool,
+    progress: &dyn Fn(&str),
+) -> Result<Joined, ErrorResponse> {
+    let joined = netsh::join_via_netsh(ssid, security, password, hidden, progress)
+        .map_err(|message| ErrorResponse { message })?;
+    Ok(Joined {
+        interface: joined.interface,
+        method: "netsh",
+        verified: joined.verified,
+    })
+}
+
+#[cfg(not(any(target_os = "macos", windows)))]
+fn join_platform(
+    _ssid: &str,
+    _security: &str,
+    _password: Option<&str>,
+    _hidden: bool,
+    _progress: &dyn Fn(&str),
+) -> Result<Joined, ErrorResponse> {
+    Err(ErrorResponse {
+        message: "Joining Wi-Fi is not supported on this platform yet.".to_string(),
     })
 }
 
@@ -119,6 +202,7 @@ fn sanitize_required(value: &str, label: &str) -> Result<String, ErrorResponse> 
     Ok(value.to_string())
 }
 
+#[cfg(target_os = "macos")]
 /// networksetup receives values as positional arguments. A value that begins
 /// with '-' would be misread as a command-line flag (argument injection), so
 /// the fallback refuses it. CoreWLAN takes values directly and needs no check.
@@ -179,7 +263,9 @@ pub fn run() {
 
 #[cfg(test)]
 mod tests {
-    use super::{ensure_not_flag, normalize_security, sanitize_optional, sanitize_required};
+    #[cfg(target_os = "macos")]
+    use super::ensure_not_flag;
+    use super::{normalize_security, sanitize_optional, sanitize_required};
 
     #[test]
     fn sanitize_required_accepts_a_normal_value() {
@@ -205,6 +291,7 @@ mod tests {
         assert_eq!(sanitize_required("-pass", "Password").unwrap(), "-pass");
     }
 
+    #[cfg(target_os = "macos")]
     #[test]
     fn ensure_not_flag_rejects_leading_dash() {
         assert!(ensure_not_flag("-setairportpower", "SSID").is_err());

@@ -1,0 +1,47 @@
+name: Windows build
+
+# Builds the Windows installer as a workflow artifact on PRs that touch the
+# app (or by hand); on a published release it also attaches the installer to
+# that release as WiLens-setup.exe (a stable name, like WiLens.dmg).
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "src/**"
+      - "src-tauri/**"
+      - "package.json"
+      - "bun.lock"
+      - ".github/workflows/build-windows.yml"
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - run: bun install --frozen-lockfile
+      - name: Build installer
+        run: bunx @tauri-apps/cli@^2 build --bundles nsis
+      - name: Collect installer
+        shell: bash
+        run: cp src-tauri/target/release/bundle/nsis/*-setup.exe WiLens-setup.exe
+      - uses: actions/upload-artifact@v4
+        with:
+          name: WiLens-windows
+          path: WiLens-setup.exe
+      - name: Attach to release
+        if: github.event_name == 'release'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: gh release upload "$TAG" WiLens-setup.exe --clobber
