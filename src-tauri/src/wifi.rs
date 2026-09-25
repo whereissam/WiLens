@@ -1,5 +1,7 @@
-use std::process::{Command, Stdio};
+use std::process::Command;
 use std::time::{Duration, Instant};
+
+use crate::process::run_with_timeout;
 
 #[cfg(target_os = "macos")]
 use objc2_core_location::{CLAuthorizationStatus, CLLocationManager};
@@ -221,6 +223,7 @@ pub fn join_via_networksetup(
     let output = run_with_timeout(
         Command::new("/usr/sbin/networksetup").args(&args),
         NETWORKSETUP_TIMEOUT,
+        "networksetup",
     )?;
 
     let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
@@ -246,41 +249,6 @@ fn reports_failure(output: &str) -> bool {
     ["could not", "failed", "error"]
         .iter()
         .any(|needle| lower.contains(needle))
-}
-
-/// Run a command to completion, killing it if it exceeds `timeout`.
-fn run_with_timeout(
-    command: &mut Command,
-    timeout: Duration,
-) -> Result<std::process::Output, String> {
-    let mut child = command
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .map_err(|error| format!("Failed to run networksetup: {error}"))?;
-
-    let deadline = Instant::now() + timeout;
-    loop {
-        match child.try_wait() {
-            Ok(Some(_)) => break,
-            Ok(None) if Instant::now() < deadline => {
-                std::thread::sleep(Duration::from_millis(100));
-            }
-            Ok(None) => {
-                let _ = child.kill();
-                let _ = child.wait();
-                return Err(format!(
-                    "networksetup did not finish within {} seconds.",
-                    timeout.as_secs()
-                ));
-            }
-            Err(error) => return Err(format!("Failed to wait for networksetup: {error}")),
-        }
-    }
-
-    child
-        .wait_with_output()
-        .map_err(|error| format!("Failed to read networksetup output: {error}"))
 }
 
 pub fn detect_wifi_interface() -> Result<String, String> {

@@ -23,6 +23,11 @@ Grab the latest macOS build from the
 (`WiLens.dmg`). Apple Silicon only. The app is unsigned, so on first launch
 right-click **WiLens → Open** to get past Gatekeeper.
 
+**Windows (x64, experimental):** releases also include `WiLens-setup.exe`,
+which joins Wi-Fi through a per-user `netsh wlan` profile (no administrator
+prompt). It is unsigned, so SmartScreen asks first — choose **More info → Run
+anyway**. WPA3-only networks are not supported yet.
+
 ## Current Status
 
 WiLens joins Wi-Fi via CoreWLAN (no administrator prompt), verifying the
@@ -62,6 +67,25 @@ page links to) in one step:
 ```bash
 bun run release:dmg
 ```
+
+Build the Windows installer (`WiLens-setup.exe`) from a Mac by
+cross-compiling. One-time setup:
+
+```bash
+brew install nsis llvm lld
+cargo install --locked cargo-xwin
+rustup target add x86_64-pc-windows-msvc
+```
+
+Then:
+
+```bash
+bun run release:win
+```
+
+The first run downloads the Windows SDK/CRT libraries. This is Tauri's
+experimental cross-compile path; release builds come from the `Windows build`
+GitHub workflow, which uses a real Windows runner.
 
 ## Permissions
 

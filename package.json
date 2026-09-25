@@ -10,6 +10,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
+    "release:win": "cargo tauri build --runner cargo-xwin --target x86_64-pc-windows-msvc --config '{\"bundle\":{\"targets\":[\"nsis\"]}}' && cp \"$(ls -t src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/WiLens_*_x64-setup.exe | head -1)\" src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/WiLens-setup.exe && echo 'Built src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/WiLens-setup.exe'",
     "release:dmg": "cargo tauri build && cp \"$(ls -t src-tauri/target/release/bundle/dmg/WiLens_*_aarch64.dmg | head -1)\" src-tauri/target/release/bundle/dmg/WiLens.dmg && echo 'Built src-tauri/target/release/bundle/dmg/WiLens.dmg'"
   },
   "dependencies": {
