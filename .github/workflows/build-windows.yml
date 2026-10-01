@@ -34,7 +34,7 @@ jobs:
       - name: Collect installer
         shell: bash
         run: cp src-tauri/target/release/bundle/nsis/*-setup.exe WiLens-setup.exe
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: WiLens-windows
           path: WiLens-setup.exe
