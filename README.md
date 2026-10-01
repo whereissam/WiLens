@@ -20,8 +20,22 @@ WIFI:T:WPA;S:MyWifi;P:mypassword;;
 
 Grab the latest macOS build from the
 [Releases page](https://github.com/whereissam/WiLens/releases/latest)
-(`WiLens.dmg`). Apple Silicon only. The app is unsigned, so on first launch
-right-click **WiLens → Open** to get past Gatekeeper.
+(`WiLens.dmg`). Apple Silicon only.
+
+The app is ad-hoc signed but not notarized, so macOS asks you to confirm the
+first launch:
+
+1. Open `WiLens.dmg` and drag **WiLens** into **Applications**.
+2. Launch WiLens. When macOS says it can't verify the developer, click **Done**.
+3. Open **System Settings → Privacy & Security**, scroll down, click
+   **Open Anyway** next to WiLens, and confirm.
+
+If macOS instead says *"WiLens is damaged and can't be opened"* (builds up to
+0.1.2), remove the download quarantine flag and open it again:
+
+```sh
+xattr -dr com.apple.quarantine /Applications/WiLens.app
+```
 
 **Windows (x64, experimental):** releases also include `WiLens-setup.exe`,
 which joins Wi-Fi through a per-user `netsh wlan` profile (no administrator
