@@ -14,7 +14,7 @@
     "release:dmg": "cargo tauri build && cp \"$(ls -t src-tauri/target/release/bundle/dmg/WiLens_*_aarch64.dmg | head -1)\" src-tauri/target/release/bundle/dmg/WiLens.dmg && echo 'Built src-tauri/target/release/bundle/dmg/WiLens.dmg'"
   },
   "dependencies": {
-    "@tauri-apps/api": "^2.11.1",
+    "@tauri-apps/api": "^2.12.1",
     "@zxing/browser": "^0.2.1"
   },
   "devDependencies": {
