@@ -1,0 +1,39 @@
+name: Feature request
+description: Suggest an idea for WiLens.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        WiLens focuses on three things: **Connect**, **Share**, and **Check** Wi-Fi, privately and without accounts. Please check the [roadmap](https://github.com/whereissam/WiLens/blob/main/docs/todo.md) first. Some ideas are planned, and some are deliberately postponed.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+      description: Describe the situation, e.g. "When I'm at a hotel, I can't tell whether..."
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like WiLens to do?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What do you do today instead?
+  - type: dropdown
+    id: privacy
+    attributes:
+      label: Would this need WiLens to store data or contact the internet?
+      options:
+        - "No"
+        - "Yes"
+        - Not sure
+  - type: checkboxes
+    id: contribute
+    attributes:
+      label: Contributing
+      options:
+        - label: I'd like to help build this.

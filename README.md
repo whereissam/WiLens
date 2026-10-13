@@ -149,7 +149,15 @@ verify it yourself.
 
 - [Product scope and architecture](docs/product-scope.md)
 - [Usage guide](docs/usage.md)
-- [Implementation TODO](docs/todo.md)
+- [Roadmap and TODO](docs/todo.md)
+- [Changelog](CHANGELOG.md)
+
+## Contributing
+
+Contributions are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md) for setup,
+checks, and project principles. Issues labelled
+[`good first issue`](https://github.com/whereissam/WiLens/labels/good%20first%20issue)
+are a good place to start.
 
 ## License
 
