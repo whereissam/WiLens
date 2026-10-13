@@ -8,7 +8,7 @@ import {
   type WifiPayload,
   type WifiSecurity,
 } from "./qr";
-import { canvasToPng, drawWifiQr } from "./share";
+import { canvasToBlob, canvasToPng, drawWifiQr } from "./share";
 
 type ScannerState = "idle" | "scanning" | "joining" | "joined" | "error";
 type Mode = "join" | "share" | "check";
@@ -160,6 +160,7 @@ app.innerHTML = `
         <p class="system-note">Anyone who sees or photographs this code can join the network. Only share it with people you trust.</p>
         <div class="result-actions">
           <button id="share-save" class="button button-primary" disabled>Save image…</button>
+          <button id="share-copy" class="button button-secondary" disabled>Copy image</button>
         </div>
       </article>
     </section>
@@ -227,6 +228,7 @@ const qrCard = queryElement<HTMLElement>("#qr-card");
 const shareCanvas = queryElement<HTMLCanvasElement>("#share-canvas");
 const shareHint = queryElement<HTMLElement>("#share-hint");
 const shareSave = queryElement<HTMLButtonElement>("#share-save");
+const shareCopy = queryElement<HTMLButtonElement>("#share-copy");
 
 const reader = new BrowserMultiFormatReader();
 let controls: IScannerControls | null = null;
@@ -257,6 +259,9 @@ shareReveal.addEventListener("click", () => {
   const reveal = sharePassword.type === "password";
   sharePassword.type = reveal ? "text" : "password";
   shareReveal.textContent = reveal ? "Hide" : "Show";
+});
+shareCopy.addEventListener("click", () => {
+  void copyShareImage();
 });
 shareSave.addEventListener("click", () => {
   void saveShareImage();
@@ -638,6 +643,7 @@ function updateSharePreview(): void {
     qrCard.classList.remove("is-empty");
     shareHint.textContent = `Guests can scan this to join '${revealInvisible(shareSsid.value)}'.`;
     shareSave.disabled = saving;
+    shareCopy.disabled = false;
   } catch (error) {
     shareCanvas.width = 0;
     shareCanvas.height = 0;
@@ -646,6 +652,23 @@ function updateSharePreview(): void {
       ? getErrorMessage(error, "These details can't make a QR code.")
       : "Enter your network's name and password to make a code.";
     shareSave.disabled = true;
+    shareCopy.disabled = true;
+  }
+}
+
+async function copyShareImage(): Promise<void> {
+  if (qrCard.classList.contains("is-empty")) {
+    return;
+  }
+  try {
+    // WebKit only allows clipboard writes that start inside the click, so the
+    // image is handed over as a promise instead of awaited first.
+    await navigator.clipboard.write([
+      new ClipboardItem({ "image/png": canvasToBlob(shareCanvas) }),
+    ]);
+    setStatus("Copied the QR code image. Paste it into a message or document.");
+  } catch (error) {
+    setStatus(getErrorMessage(error, "Could not copy the image. Use Save image instead."));
   }
 }
 
