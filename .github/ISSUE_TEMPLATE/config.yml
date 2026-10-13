@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/whereissam/WiLens/security/advisories/new
+    about: Please report security issues privately.
+  - name: Roadmap
+    url: https://github.com/whereissam/WiLens/blob/main/docs/todo.md
+    about: See what's planned before requesting a feature.
