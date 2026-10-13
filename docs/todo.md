@@ -194,9 +194,9 @@ Several behaviors depend on the OS and can't be proven in CI.
 
 ## Phase 13: Connect Improvements
 
-- [ ] Scan a QR code from an image file, the clipboard, or drag-and-drop (no camera needed).
+- [x] Scan a QR code from an image file, the clipboard, or drag-and-drop (no camera needed).
 - [ ] Scan a QR code shown on screen (e.g. a code in a chat or a PDF).
-- [ ] After a failed join, offer **Check connection** with one click.
+- [x] After a failed join, offer **Check connection** with one click.
 - [ ] Windows: support WPA3-only networks (`WPA3SAE` profile) where the OS allows it.
 - [ ] Windows: replace `netsh` with the Native Wifi API (`WlanSetProfile`, `WlanConnect`) for non-localized results and literal profile names.
 - [ ] macOS: handle hidden networks explicitly (`includeHidden` scan plus a clearer "not found" message).
@@ -204,14 +204,14 @@ Several behaviors depend on the OS and can't be proven in CI.
 
 ## Phase 14: Share Improvements
 
-- [ ] Copy the QR image to the clipboard.
+- [x] Copy the QR image to the clipboard.
 - [ ] Printable card layout (network name, QR code, optional "scan to join" text).
 - [ ] "Share the network I'm on" — read the current SSID, and the password only after an explicit keychain prompt. Never store it.
 - [ ] Show the payload text for people who want to paste it elsewhere (behind a "show details" toggle).
 
 ## Phase 15: Check Improvements
 
-- [ ] **Open sign-in page** button for captive portals (opens the system browser to a fixed probe URL, no arbitrary links).
+- [x] **Open sign-in page** button for captive portals (opens the system browser to a fixed probe URL, no arbitrary links).
 - [ ] Detect an active VPN and say when it may be the cause.
 - [ ] Check IPv6 connectivity separately.
 - [ ] Show Wi-Fi signal strength and channel when the OS reports them (no spectrum analysis).

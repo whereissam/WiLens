@@ -36,12 +36,18 @@ WIFI:T:WPA;S:MyWifi;P:mypassword;;
 7. Click `Join network`.
 8. Approve any macOS prompt if shown.
 
+No camera handy? Click `Scan an image…`, drop a picture of the QR code onto the
+window, or paste one with Cmd+V (Ctrl+V on Windows). Pasting the `WIFI:` text
+itself works too. If joining fails, a `Check connection` button runs the
+connection check straight away.
+
 ## Share a Network
 
 Switch to **Share a network**, type the network name, security type, and
 password, and WiLens draws a standard Wi-Fi QR code as you type. **Save image…**
 asks where to save a PNG (the network name is printed under the code; the
-password is not). Anyone who sees the code can join the network, so share it
+password is not); **Copy image** puts it on the clipboard instead. Anyone who
+sees the code can join the network, so share it
 only with people you trust. WiLens does not keep the details after you close it.
 
 ## Check a Connection
@@ -56,6 +62,7 @@ in order and explains where the connection stops working:
 4. **Internet:** does the internet answer, or does a sign-in page answer
    instead (common in hotels, airports, and cafés)?
 
+If a sign-in page is found, **Open sign-in page** opens it in your browser.
 **Copy report** copies the result as text to paste into a support request. It
 contains no passwords or network names. The check only contacts your router and
 `captive.apple.com` (Windows: `www.msftconnecttest.com`), and only when you

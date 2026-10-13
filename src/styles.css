@@ -532,3 +532,14 @@ h1 {
     grid-template-columns: 1fr;
   }
 }
+
+.hint {
+  margin: 0.9rem 0 0;
+  color: rgba(236, 243, 239, 0.6);
+  font-size: 0.9rem;
+}
+
+.hint code {
+  font-family: "SF Mono", "Menlo", monospace;
+  font-size: 0.9em;
+}

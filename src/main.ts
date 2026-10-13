@@ -8,7 +8,7 @@ import {
   type WifiPayload,
   type WifiSecurity,
 } from "./qr";
-import { canvasToPng, drawWifiQr } from "./share";
+import { canvasToBlob, canvasToPng, drawWifiQr } from "./share";
 
 type ScannerState = "idle" | "scanning" | "joining" | "joined" | "error";
 type Mode = "join" | "share" | "check";
@@ -88,7 +88,10 @@ app.innerHTML = `
       <div id="join-actions" class="hero-actions">
         <button id="start-scan" class="button button-primary">Start camera</button>
         <button id="rescan" class="button button-secondary" disabled>Scan again</button>
+        <button id="scan-image" class="button button-secondary">Scan an image…</button>
+        <input id="scan-image-input" type="file" accept="image/*" hidden />
       </div>
+      <p id="join-hint" class="hint">No camera handy? Drop or paste a picture of the QR code, or paste its <code>WIFI:</code> text.</p>
       <p id="status" class="status" role="status" aria-live="polite">Camera is idle.</p>
     </section>
 
@@ -119,6 +122,7 @@ app.innerHTML = `
         <div class="result-actions">
           <button id="join-network" class="button button-primary" disabled>Join network</button>
           <button id="copy-password" class="button button-secondary" disabled>Copy password</button>
+          <button id="check-after-fail" class="button button-secondary" hidden>Check connection</button>
         </div>
       </article>
     </section>
@@ -156,6 +160,7 @@ app.innerHTML = `
         <p class="system-note">Anyone who sees or photographs this code can join the network. Only share it with people you trust.</p>
         <div class="result-actions">
           <button id="share-save" class="button button-primary" disabled>Save image…</button>
+          <button id="share-copy" class="button button-secondary" disabled>Copy image</button>
         </div>
       </article>
     </section>
@@ -175,6 +180,7 @@ app.innerHTML = `
         </ol>
         <div class="result-actions">
           <button id="check-run" class="button button-primary">Run check</button>
+          <button id="check-sign-in" class="button button-primary" hidden>Open sign-in page</button>
           <button id="check-copy" class="button button-secondary" disabled>Copy report</button>
         </div>
         <p class="system-note">The check pings your router and asks ${CHECK_HOST} for a small page, the same address ${isWindows ? "Windows" : "macOS"} uses to detect sign-in pages. It only runs when you click Run check, and the report contains no passwords or network names.</p>
@@ -188,6 +194,10 @@ const startButton = queryElement<HTMLButtonElement>("#start-scan");
 const rescanButton = queryElement<HTMLButtonElement>("#rescan");
 const joinButton = queryElement<HTMLButtonElement>("#join-network");
 const copyButton = queryElement<HTMLButtonElement>("#copy-password");
+const checkAfterFailButton = queryElement<HTMLButtonElement>("#check-after-fail");
+const scanImageButton = queryElement<HTMLButtonElement>("#scan-image");
+const scanImageInput = queryElement<HTMLInputElement>("#scan-image-input");
+const joinHint = queryElement<HTMLElement>("#join-hint");
 const statusElement = queryElement<HTMLParagraphElement>("#status");
 const resultCard = queryElement<HTMLElement>("#result-card");
 const ssidElement = queryElement<HTMLElement>("#ssid");
@@ -201,6 +211,7 @@ const checkPanel = queryElement<HTMLElement>("#check-panel");
 const checkSummary = queryElement<HTMLElement>("#check-summary");
 const checkRun = queryElement<HTMLButtonElement>("#check-run");
 const checkCopy = queryElement<HTMLButtonElement>("#check-copy");
+const checkSignIn = queryElement<HTMLButtonElement>("#check-sign-in");
 const heroTitle = queryElement<HTMLElement>("#hero-title");
 const heroLede = queryElement<HTMLElement>("#hero-lede");
 const joinActions = queryElement<HTMLElement>("#join-actions");
@@ -217,6 +228,7 @@ const qrCard = queryElement<HTMLElement>("#qr-card");
 const shareCanvas = queryElement<HTMLCanvasElement>("#share-canvas");
 const shareHint = queryElement<HTMLElement>("#share-hint");
 const shareSave = queryElement<HTMLButtonElement>("#share-save");
+const shareCopy = queryElement<HTMLButtonElement>("#share-copy");
 
 const reader = new BrowserMultiFormatReader();
 let controls: IScannerControls | null = null;
@@ -236,12 +248,20 @@ checkRun.addEventListener("click", () => {
 checkCopy.addEventListener("click", () => {
   void copyCheckReport();
 });
+checkSignIn.addEventListener("click", () => {
+  invoke("open_sign_in_page").catch((error: unknown) =>
+    setStatus(getErrorMessage(error, "Could not open the browser.")),
+  );
+});
 shareForm.addEventListener("input", updateSharePreview);
 shareForm.addEventListener("submit", (event) => event.preventDefault());
 shareReveal.addEventListener("click", () => {
   const reveal = sharePassword.type === "password";
   sharePassword.type = reveal ? "text" : "password";
   shareReveal.textContent = reveal ? "Hide" : "Show";
+});
+shareCopy.addEventListener("click", () => {
+  void copyShareImage();
 });
 shareSave.addEventListener("click", () => {
   void saveShareImage();
@@ -265,6 +285,61 @@ copyButton.addEventListener("click", () => {
   void copyPassword();
 });
 
+scanImageButton.addEventListener("click", () => scanImageInput.click());
+scanImageInput.addEventListener("change", () => {
+  const file = scanImageInput.files?.[0];
+  scanImageInput.value = "";
+  if (file) {
+    void scanImage(file);
+  }
+});
+
+// Drop an image anywhere in the window while joining.
+window.addEventListener("dragover", (event) => {
+  if (mode === "join" && event.dataTransfer?.types.includes("Files")) {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "copy";
+  }
+});
+window.addEventListener("drop", (event) => {
+  if (mode !== "join") {
+    return;
+  }
+  event.preventDefault();
+  const file = event.dataTransfer?.files[0];
+  if (file) {
+    void scanImage(file);
+  }
+});
+
+// Paste an image or the WIFI: text itself (Cmd/Ctrl+V) while joining.
+document.addEventListener("paste", (event) => {
+  if (mode !== "join" || state === "joining" || isTypingTarget(event.target)) {
+    return;
+  }
+  const file = Array.from(event.clipboardData?.files ?? []).find((item) =>
+    item.type.startsWith("image/"),
+  );
+  if (file) {
+    event.preventDefault();
+    void scanImage(file);
+    return;
+  }
+  const text = event.clipboardData?.getData("text/plain").trim() ?? "";
+  if (text.startsWith("WIFI:")) {
+    event.preventDefault();
+    resetResult();
+    acceptQrText(text);
+  }
+});
+
+// A failed join is often not about the QR code at all (no internet, a
+// sign-in page, DNS), so offer the connection check right there.
+checkAfterFailButton.addEventListener("click", () => {
+  setMode("check");
+  void runCheck();
+});
+
 async function startScan(): Promise<void> {
   if (state === "scanning" || state === "joining") {
     return;
@@ -283,16 +358,7 @@ async function startScan(): Promise<void> {
         return;
       }
 
-      try {
-        const payload = parseWifiQr(result.getText());
-        currentPayload = payload;
-        state = "idle";
-        stopScan();
-        renderPayload(payload);
-        setStatus(`Ready to join '${revealInvisible(payload.ssid)}'.`);
-      } catch (parseError) {
-        setStatus(getErrorMessage(parseError, "QR code detected, but it is not a valid Wi-Fi payload."));
-      }
+      acceptQrText(result.getText());
     });
 
     // A code may have been decoded, or the scan cancelled, while the camera
@@ -312,12 +378,67 @@ function stopScan(): void {
   controls = null;
 }
 
+/** Show a decoded QR payload, from the camera, an image, or pasted text. */
+function acceptQrText(text: string): void {
+  try {
+    const payload = parseWifiQr(text);
+    currentPayload = payload;
+    state = "idle";
+    stopScan();
+    renderPayload(payload);
+    setStatus(`Ready to join '${revealInvisible(payload.ssid)}'.`);
+  } catch (parseError) {
+    setStatus(getErrorMessage(parseError, "QR code detected, but it is not a valid Wi-Fi payload."));
+  }
+}
+
+/** Largest image accepted for scanning; QR screenshots are far smaller. */
+const MAX_SCAN_IMAGE_BYTES = 25 * 1024 * 1024;
+
+async function scanImage(file: Blob): Promise<void> {
+  if (state === "joining") {
+    return;
+  }
+  if (!file.type.startsWith("image/") || file.size > MAX_SCAN_IMAGE_BYTES) {
+    setStatus("That file isn't an image WiLens can read.");
+    return;
+  }
+
+  resetResult();
+  setStatus("Looking for a QR code in the image...");
+  try {
+    // A data: URL, because the content security policy doesn't allow blob: images.
+    const result = await reader.decodeFromImageUrl(await readAsDataUrl(file));
+    acceptQrText(result.getText());
+  } catch {
+    setStatus("No QR code was found in that image. Try a sharper or closer picture.");
+  }
+}
+
+function readAsDataUrl(file: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const fileReader = new FileReader();
+    fileReader.onload = () => resolve(String(fileReader.result));
+    fileReader.onerror = () => reject(fileReader.error);
+    fileReader.readAsDataURL(file);
+  });
+}
+
+function isTypingTarget(target: EventTarget | null): boolean {
+  return (
+    target instanceof HTMLInputElement ||
+    target instanceof HTMLTextAreaElement ||
+    target instanceof HTMLSelectElement
+  );
+}
+
 async function joinNetwork(): Promise<void> {
   if (!currentPayload || state === "joining") {
     return;
   }
 
   state = "joining";
+  checkAfterFailButton.hidden = true;
   setStatus(`Joining '${revealInvisible(currentPayload.ssid)}'...`);
   toggleControls();
 
@@ -343,6 +464,7 @@ async function joinNetwork(): Promise<void> {
     setStatus(response.message);
   } catch (error) {
     setError(getErrorMessage(error, "Joining the network failed."));
+    checkAfterFailButton.hidden = false;
     return;
   }
 
@@ -365,6 +487,7 @@ async function copyPassword(): Promise<void> {
 function resetResult(): void {
   stopScan();
   currentPayload = null;
+  checkAfterFailButton.hidden = true;
   state = "idle";
   ssidElement.textContent = "No network scanned yet";
   securityElement.textContent = "-";
@@ -412,6 +535,7 @@ function setMode(next: Mode): void {
   modeCheckTab.setAttribute("aria-selected", String(next === "check"));
   scannerPanel.hidden = next !== "join";
   joinActions.hidden = next !== "join";
+  joinHint.hidden = next !== "join";
   sharePanel.hidden = next !== "share";
   checkPanel.hidden = next !== "check";
   heroTitle.textContent = HERO_TEXT[next].title;
@@ -438,6 +562,7 @@ async function runCheck(): Promise<void> {
   checkRun.classList.add("is-busy");
   checkRun.textContent = "Checking...";
   checkCopy.disabled = true;
+  checkSignIn.hidden = true;
   checkSummary.textContent = "Checking your connection...";
   CHECK_STEPS.forEach(({ id }, index) =>
     renderCheckStep({ id, status: "skipped", detail: index === 0 ? "Checking..." : "Waiting" }, index === 0 ? "running" : "idle"),
@@ -458,6 +583,7 @@ async function runCheck(): Promise<void> {
     lastReport = report;
     checkSummary.textContent = report.summary;
     checkCopy.disabled = false;
+    checkSignIn.hidden = report.verdict !== "signInRequired";
   } catch (error) {
     checkSummary.textContent = getErrorMessage(error, "The connection check could not run.");
   } finally {
@@ -517,6 +643,7 @@ function updateSharePreview(): void {
     qrCard.classList.remove("is-empty");
     shareHint.textContent = `Guests can scan this to join '${revealInvisible(shareSsid.value)}'.`;
     shareSave.disabled = saving;
+    shareCopy.disabled = false;
   } catch (error) {
     shareCanvas.width = 0;
     shareCanvas.height = 0;
@@ -525,6 +652,23 @@ function updateSharePreview(): void {
       ? getErrorMessage(error, "These details can't make a QR code.")
       : "Enter your network's name and password to make a code.";
     shareSave.disabled = true;
+    shareCopy.disabled = true;
+  }
+}
+
+async function copyShareImage(): Promise<void> {
+  if (qrCard.classList.contains("is-empty")) {
+    return;
+  }
+  try {
+    // WebKit only allows clipboard writes that start inside the click, so the
+    // image is handed over as a promise instead of awaited first.
+    await navigator.clipboard.write([
+      new ClipboardItem({ "image/png": canvasToBlob(shareCanvas) }),
+    ]);
+    setStatus("Copied the QR code image. Paste it into a message or document.");
+  } catch (error) {
+    setStatus(getErrorMessage(error, "Could not copy the image. Use Save image instead."));
   }
 }
 

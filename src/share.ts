@@ -57,6 +57,19 @@ export function drawWifiQr(canvas: HTMLCanvasElement, payload: string, ssid: str
   );
 }
 
+/** The canvas contents as a PNG blob. */
+export function canvasToBlob(canvas: HTMLCanvasElement): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (blob) {
+        resolve(blob);
+      } else {
+        reject(new Error("Could not create the image."));
+      }
+    }, "image/png");
+  });
+}
+
 /** The canvas contents as PNG bytes. */
 export function canvasToPng(canvas: HTMLCanvasElement): Promise<Uint8Array> {
   return new Promise((resolve, reject) => {
