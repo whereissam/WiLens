@@ -119,6 +119,7 @@ app.innerHTML = `
         <div class="result-actions">
           <button id="join-network" class="button button-primary" disabled>Join network</button>
           <button id="copy-password" class="button button-secondary" disabled>Copy password</button>
+          <button id="check-after-fail" class="button button-secondary" hidden>Check connection</button>
         </div>
       </article>
     </section>
@@ -188,6 +189,7 @@ const startButton = queryElement<HTMLButtonElement>("#start-scan");
 const rescanButton = queryElement<HTMLButtonElement>("#rescan");
 const joinButton = queryElement<HTMLButtonElement>("#join-network");
 const copyButton = queryElement<HTMLButtonElement>("#copy-password");
+const checkAfterFailButton = queryElement<HTMLButtonElement>("#check-after-fail");
 const statusElement = queryElement<HTMLParagraphElement>("#status");
 const resultCard = queryElement<HTMLElement>("#result-card");
 const ssidElement = queryElement<HTMLElement>("#ssid");
@@ -265,6 +267,13 @@ copyButton.addEventListener("click", () => {
   void copyPassword();
 });
 
+// A failed join is often not about the QR code at all (no internet, a
+// sign-in page, DNS), so offer the connection check right there.
+checkAfterFailButton.addEventListener("click", () => {
+  setMode("check");
+  void runCheck();
+});
+
 async function startScan(): Promise<void> {
   if (state === "scanning" || state === "joining") {
     return;
@@ -318,6 +327,7 @@ async function joinNetwork(): Promise<void> {
   }
 
   state = "joining";
+  checkAfterFailButton.hidden = true;
   setStatus(`Joining '${revealInvisible(currentPayload.ssid)}'...`);
   toggleControls();
 
@@ -343,6 +353,7 @@ async function joinNetwork(): Promise<void> {
     setStatus(response.message);
   } catch (error) {
     setError(getErrorMessage(error, "Joining the network failed."));
+    checkAfterFailButton.hidden = false;
     return;
   }
 
@@ -365,6 +376,7 @@ async function copyPassword(): Promise<void> {
 function resetResult(): void {
   stopScan();
   currentPayload = null;
+  checkAfterFailButton.hidden = true;
   state = "idle";
   ssidElement.textContent = "No network scanned yet";
   securityElement.textContent = "-";
