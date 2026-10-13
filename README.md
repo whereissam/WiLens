@@ -159,6 +159,8 @@ checks, and project principles. Issues labelled
 [`good first issue`](https://github.com/whereissam/WiLens/labels/good%20first%20issue)
 are a good place to start.
 
+- [Release Testing Manual](docs/testing.md) – Step-by-step physical device testing checklist across macOS and Windows.
+
 ## License
 
 [MIT](LICENSE) © whereissam
