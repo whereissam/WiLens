@@ -88,7 +88,10 @@ app.innerHTML = `
       <div id="join-actions" class="hero-actions">
         <button id="start-scan" class="button button-primary">Start camera</button>
         <button id="rescan" class="button button-secondary" disabled>Scan again</button>
+        <button id="scan-image" class="button button-secondary">Scan an image…</button>
+        <input id="scan-image-input" type="file" accept="image/*" hidden />
       </div>
+      <p id="join-hint" class="hint">No camera handy? Drop or paste a picture of the QR code, or paste its <code>WIFI:</code> text.</p>
       <p id="status" class="status" role="status" aria-live="polite">Camera is idle.</p>
     </section>
 
@@ -190,6 +193,9 @@ const rescanButton = queryElement<HTMLButtonElement>("#rescan");
 const joinButton = queryElement<HTMLButtonElement>("#join-network");
 const copyButton = queryElement<HTMLButtonElement>("#copy-password");
 const checkAfterFailButton = queryElement<HTMLButtonElement>("#check-after-fail");
+const scanImageButton = queryElement<HTMLButtonElement>("#scan-image");
+const scanImageInput = queryElement<HTMLInputElement>("#scan-image-input");
+const joinHint = queryElement<HTMLElement>("#join-hint");
 const statusElement = queryElement<HTMLParagraphElement>("#status");
 const resultCard = queryElement<HTMLElement>("#result-card");
 const ssidElement = queryElement<HTMLElement>("#ssid");
@@ -267,6 +273,54 @@ copyButton.addEventListener("click", () => {
   void copyPassword();
 });
 
+scanImageButton.addEventListener("click", () => scanImageInput.click());
+scanImageInput.addEventListener("change", () => {
+  const file = scanImageInput.files?.[0];
+  scanImageInput.value = "";
+  if (file) {
+    void scanImage(file);
+  }
+});
+
+// Drop an image anywhere in the window while joining.
+window.addEventListener("dragover", (event) => {
+  if (mode === "join" && event.dataTransfer?.types.includes("Files")) {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "copy";
+  }
+});
+window.addEventListener("drop", (event) => {
+  if (mode !== "join") {
+    return;
+  }
+  event.preventDefault();
+  const file = event.dataTransfer?.files[0];
+  if (file) {
+    void scanImage(file);
+  }
+});
+
+// Paste an image or the WIFI: text itself (Cmd/Ctrl+V) while joining.
+document.addEventListener("paste", (event) => {
+  if (mode !== "join" || state === "joining" || isTypingTarget(event.target)) {
+    return;
+  }
+  const file = Array.from(event.clipboardData?.files ?? []).find((item) =>
+    item.type.startsWith("image/"),
+  );
+  if (file) {
+    event.preventDefault();
+    void scanImage(file);
+    return;
+  }
+  const text = event.clipboardData?.getData("text/plain").trim() ?? "";
+  if (text.startsWith("WIFI:")) {
+    event.preventDefault();
+    resetResult();
+    acceptQrText(text);
+  }
+});
+
 // A failed join is often not about the QR code at all (no internet, a
 // sign-in page, DNS), so offer the connection check right there.
 checkAfterFailButton.addEventListener("click", () => {
@@ -292,16 +346,7 @@ async function startScan(): Promise<void> {
         return;
       }
 
-      try {
-        const payload = parseWifiQr(result.getText());
-        currentPayload = payload;
-        state = "idle";
-        stopScan();
-        renderPayload(payload);
-        setStatus(`Ready to join '${revealInvisible(payload.ssid)}'.`);
-      } catch (parseError) {
-        setStatus(getErrorMessage(parseError, "QR code detected, but it is not a valid Wi-Fi payload."));
-      }
+      acceptQrText(result.getText());
     });
 
     // A code may have been decoded, or the scan cancelled, while the camera
@@ -319,6 +364,60 @@ async function startScan(): Promise<void> {
 function stopScan(): void {
   controls?.stop();
   controls = null;
+}
+
+/** Show a decoded QR payload, from the camera, an image, or pasted text. */
+function acceptQrText(text: string): void {
+  try {
+    const payload = parseWifiQr(text);
+    currentPayload = payload;
+    state = "idle";
+    stopScan();
+    renderPayload(payload);
+    setStatus(`Ready to join '${revealInvisible(payload.ssid)}'.`);
+  } catch (parseError) {
+    setStatus(getErrorMessage(parseError, "QR code detected, but it is not a valid Wi-Fi payload."));
+  }
+}
+
+/** Largest image accepted for scanning; QR screenshots are far smaller. */
+const MAX_SCAN_IMAGE_BYTES = 25 * 1024 * 1024;
+
+async function scanImage(file: Blob): Promise<void> {
+  if (state === "joining") {
+    return;
+  }
+  if (!file.type.startsWith("image/") || file.size > MAX_SCAN_IMAGE_BYTES) {
+    setStatus("That file isn't an image WiLens can read.");
+    return;
+  }
+
+  resetResult();
+  setStatus("Looking for a QR code in the image...");
+  try {
+    // A data: URL, because the content security policy doesn't allow blob: images.
+    const result = await reader.decodeFromImageUrl(await readAsDataUrl(file));
+    acceptQrText(result.getText());
+  } catch {
+    setStatus("No QR code was found in that image. Try a sharper or closer picture.");
+  }
+}
+
+function readAsDataUrl(file: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const fileReader = new FileReader();
+    fileReader.onload = () => resolve(String(fileReader.result));
+    fileReader.onerror = () => reject(fileReader.error);
+    fileReader.readAsDataURL(file);
+  });
+}
+
+function isTypingTarget(target: EventTarget | null): boolean {
+  return (
+    target instanceof HTMLInputElement ||
+    target instanceof HTMLTextAreaElement ||
+    target instanceof HTMLSelectElement
+  );
 }
 
 async function joinNetwork(): Promise<void> {
@@ -424,6 +523,7 @@ function setMode(next: Mode): void {
   modeCheckTab.setAttribute("aria-selected", String(next === "check"));
   scannerPanel.hidden = next !== "join";
   joinActions.hidden = next !== "join";
+  joinHint.hidden = next !== "join";
   sharePanel.hidden = next !== "share";
   checkPanel.hidden = next !== "check";
   heroTitle.textContent = HERO_TEXT[next].title;
