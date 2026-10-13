@@ -179,6 +179,7 @@ app.innerHTML = `
         </ol>
         <div class="result-actions">
           <button id="check-run" class="button button-primary">Run check</button>
+          <button id="check-sign-in" class="button button-primary" hidden>Open sign-in page</button>
           <button id="check-copy" class="button button-secondary" disabled>Copy report</button>
         </div>
         <p class="system-note">The check pings your router and asks ${CHECK_HOST} for a small page, the same address ${isWindows ? "Windows" : "macOS"} uses to detect sign-in pages. It only runs when you click Run check, and the report contains no passwords or network names.</p>
@@ -209,6 +210,7 @@ const checkPanel = queryElement<HTMLElement>("#check-panel");
 const checkSummary = queryElement<HTMLElement>("#check-summary");
 const checkRun = queryElement<HTMLButtonElement>("#check-run");
 const checkCopy = queryElement<HTMLButtonElement>("#check-copy");
+const checkSignIn = queryElement<HTMLButtonElement>("#check-sign-in");
 const heroTitle = queryElement<HTMLElement>("#hero-title");
 const heroLede = queryElement<HTMLElement>("#hero-lede");
 const joinActions = queryElement<HTMLElement>("#join-actions");
@@ -243,6 +245,11 @@ checkRun.addEventListener("click", () => {
 });
 checkCopy.addEventListener("click", () => {
   void copyCheckReport();
+});
+checkSignIn.addEventListener("click", () => {
+  invoke("open_sign_in_page").catch((error: unknown) =>
+    setStatus(getErrorMessage(error, "Could not open the browser.")),
+  );
 });
 shareForm.addEventListener("input", updateSharePreview);
 shareForm.addEventListener("submit", (event) => event.preventDefault());
@@ -550,6 +557,7 @@ async function runCheck(): Promise<void> {
   checkRun.classList.add("is-busy");
   checkRun.textContent = "Checking...";
   checkCopy.disabled = true;
+  checkSignIn.hidden = true;
   checkSummary.textContent = "Checking your connection...";
   CHECK_STEPS.forEach(({ id }, index) =>
     renderCheckStep({ id, status: "skipped", detail: index === 0 ? "Checking..." : "Waiting" }, index === 0 ? "running" : "idle"),
@@ -570,6 +578,7 @@ async function runCheck(): Promise<void> {
     lastReport = report;
     checkSummary.textContent = report.summary;
     checkCopy.disabled = false;
+    checkSignIn.hidden = report.verdict !== "signInRequired";
   } catch (error) {
     checkSummary.textContent = getErrorMessage(error, "The connection check could not run.");
   } finally {

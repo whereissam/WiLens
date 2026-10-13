@@ -81,6 +81,19 @@ async fn check_connection(
     })
 }
 
+/// Open the network's sign-in page in the default browser. The address is
+/// fixed in Rust, so the webview cannot use this to open arbitrary links.
+#[tauri::command]
+fn open_sign_in_page(app: tauri::AppHandle) -> Result<(), ErrorResponse> {
+    use tauri_plugin_opener::OpenerExt;
+
+    app.opener()
+        .open_url(diagnose::SIGN_IN_URL, None::<&str>)
+        .map_err(|error| ErrorResponse {
+            message: format!("Could not open the browser: {error}"),
+        })
+}
+
 /// Largest QR image the frontend may ask to save. A rendered Wi-Fi QR code is a
 /// few tens of kilobytes; the cap only stops a runaway buffer.
 const MAX_QR_IMAGE_BYTES: usize = 4 * 1024 * 1024;
@@ -366,6 +379,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_log::Builder::default().build())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_opener::init())
         .setup(|_app| {
             #[cfg(target_os = "macos")]
             request_location_authorization();
@@ -374,7 +388,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             join_wifi,
             save_qr_image,
-            check_connection
+            check_connection,
+            open_sign_in_page
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

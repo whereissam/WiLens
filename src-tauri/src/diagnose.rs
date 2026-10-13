@@ -42,6 +42,13 @@ const PROBE: ProbeTarget = ProbeTarget {
     expected: "Success",
 };
 
+/// A plain-HTTP page that a sign-in (captive) portal intercepts, so opening it
+/// in a browser brings up the portal's sign-in page. Each OS uses its own.
+#[cfg(windows)]
+pub const SIGN_IN_URL: &str = "http://www.msftconnecttest.com/redirect";
+#[cfg(not(windows))]
+pub const SIGN_IN_URL: &str = "http://captive.apple.com/";
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum Status {
