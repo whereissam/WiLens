@@ -147,9 +147,9 @@ Shipped in #56.
 - [x] Save as PNG through a Rust-side save dialog (no new webview permissions).
 - [x] Round-trip tests: build → parse, and encode → decode.
 
-## Phase 10: Connection Check (done, landing)
+## Phase 10: Connection Check (done)
 
-Reviewed in #57; landing on `main` via #58.
+Reviewed in #57; shipped in #58.
 
 - [x] Check link, router, DNS, and internet in order, streaming each step to the UI.
 - [x] Detect sign-in (captive) pages with the OS's own probe page.
@@ -169,6 +169,7 @@ app small, local-first, and account-free. Each phase should ship on its own.
 
 The biggest barrier to new users is installing an unsigned app.
 
+- [ ] Publish the `v0.2.0` GitHub release (version bump and changelog are on `main` via #61) after a smoke test.
 - [ ] Get an Apple Developer ID and add the `APPLE_*` secrets so `build-macos.yml` signs and notarizes `WiLens.dmg`.
 - [ ] Run the `macOS build` workflow once by hand before the next release.
 - [ ] Remove the "Open Anyway" / `xattr` instructions from the README and landing page once releases are notarized.
@@ -176,7 +177,7 @@ The biggest barrier to new users is installing an unsigned app.
 - [ ] Publish a Homebrew cask (`brew install --cask wilens`).
 - [ ] Publish to winget once the Windows build is no longer experimental.
 - [ ] Record a new demo GIF covering Join, Share, and Check.
-- [ ] Release notes for each version (what changed, what to test).
+- [x] Release notes for each version: `CHANGELOG.md` (#61); copy the version's section into the GitHub release.
 
 ## Phase 12: Real-Device Testing
 
@@ -190,13 +191,13 @@ Several behaviors depend on the OS and can't be proven in CI.
 - [ ] Windows 11 24H2 with Location denied: join reports "could not confirm" and doesn't delete the profile.
 - [ ] Share: save a PNG, scan it with iPhone and Android cameras, and confirm both offer to join.
 - [ ] Check: working network, Wi-Fi off, router unplugged from the internet, and a hotel/café sign-in page.
-- [ ] Turn the results into a short `docs/testing.md` checklist for each release.
+- [ ] Turn the results into a short `docs/testing.md` checklist for each release. *(#68; community PR #70 in review)*
 
 ## Phase 13: Connect Improvements
 
-- [x] Scan a QR code from an image file, the clipboard, or drag-and-drop (no camera needed).
+- [x] Scan a QR code from an image file, the clipboard, or drag-and-drop (no camera needed). *(#60)*
 - [ ] Scan a QR code shown on screen (e.g. a code in a chat or a PDF).
-- [x] After a failed join, offer **Check connection** with one click.
+- [x] After a failed join, offer **Check connection** with one click. *(#60)*
 - [ ] Windows: support WPA3-only networks (`WPA3SAE` profile) where the OS allows it.
 - [ ] Windows: replace `netsh` with the Native Wifi API (`WlanSetProfile`, `WlanConnect`) for non-localized results and literal profile names.
 - [ ] macOS: handle hidden networks explicitly (`includeHidden` scan plus a clearer "not found" message).
@@ -204,14 +205,14 @@ Several behaviors depend on the OS and can't be proven in CI.
 
 ## Phase 14: Share Improvements
 
-- [x] Copy the QR image to the clipboard.
+- [x] Copy the QR image to the clipboard. *(#60)*
 - [ ] Printable card layout (network name, QR code, optional "scan to join" text).
 - [ ] "Share the network I'm on" — read the current SSID, and the password only after an explicit keychain prompt. Never store it.
-- [ ] Show the payload text for people who want to paste it elsewhere (behind a "show details" toggle).
+- [ ] Show the payload text for people who want to paste it elsewhere (behind a "show details" toggle). *(good first issue #67)*
 
 ## Phase 15: Check Improvements
 
-- [x] **Open sign-in page** button for captive portals (opens the system browser to a fixed probe URL, no arbitrary links).
+- [x] **Open sign-in page** button for captive portals (opens the system browser to a fixed probe URL, no arbitrary links). *(#60)*
 - [ ] Detect an active VPN and say when it may be the cause.
 - [ ] Check IPv6 connectivity separately.
 - [ ] Show Wi-Fi signal strength and channel when the OS reports them (no spectrum analysis).
@@ -220,15 +221,18 @@ Several behaviors depend on the OS and can't be proven in CI.
 
 ## Phase 16: Contributors & Community
 
-- [ ] `CONTRIBUTING.md`: setup, tests, coding style, how to propose features.
-- [ ] Issue templates: bug report (with Copy report output), feature request, platform compatibility.
-- [ ] Label and publish good first issues, for example:
-  - [ ] Add parser tests for unusual payloads (`WIFI:` with fields in any order, trailing spaces, empty `H:`).
-  - [ ] Add property-based / fuzz tests for `parseWifiQr` and `buildWifiQr` round-trips.
-  - [ ] Add keyboard shortcuts for the three modes.
-  - [ ] Improve focus styles and screen-reader labels (accessibility pass).
+- [x] `CONTRIBUTING.md`: setup, tests, coding style, how to propose features. *(#62)*
+- [x] Issue forms: bug report (with Copy report output, OS and version) and feature request; PR template with a privacy checklist. *(#62)*
+- [x] `macos` / `windows` labels and published good first issues:
+  - [x] Parser tests for unusual payloads. *(#63, done by a contributor in #69)*
+  - [ ] Property-based round-trip tests for `parseWifiQr` and `buildWifiQr`. *(#64)*
+  - [ ] Arrow-key navigation for the mode tabs. *(#65)*
+  - [ ] Keyboard shortcuts for the three modes. *(#66)*
+  - [ ] Share "Show details" payload toggle. *(#67)*
+  - [ ] Release testing checklist, `docs/testing.md`. *(#68, PR #70 in review)*
+- [ ] Improve focus styles and screen-reader labels (accessibility pass).
 - [ ] Localization: extract UI strings and accept translations.
-- [ ] A lightweight public roadmap (this file, linked from the README).
+- [x] A lightweight public roadmap (this file, linked from the README).
 
 ## Phase 17: Later
 
