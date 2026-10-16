@@ -195,6 +195,12 @@ fn join_wifi_blocking(
 
     let message = if joined.verified {
         format!("Joined '{ssid}' successfully.")
+    } else if cfg!(windows) {
+        // Windows 11 24H2+ hides the current SSID from apps without Location
+        // access, which is the usual reason a join can't be confirmed.
+        format!(
+            "Asked Windows to join '{ssid}', but it could not confirm the connection. Check the Wi-Fi icon to be sure. To let WiLens confirm joins, turn on Settings > Privacy & security > Location > Let desktop apps access your location."
+        )
     } else {
         format!(
             "Asked the system to join '{ssid}', but it could not confirm the connection. Check the Wi-Fi icon to be sure."
