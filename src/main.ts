@@ -456,6 +456,7 @@ async function joinNetwork(): Promise<void> {
         password: currentPayload.password,
         security: currentPayload.security,
         hidden: currentPayload.hidden,
+        wpa3: currentPayload.wpa3,
       },
       onProgress,
     });
@@ -500,7 +501,7 @@ function resetResult(): void {
 
 function renderPayload(payload: WifiPayload): void {
   ssidElement.textContent = revealInvisible(payload.ssid);
-  securityElement.textContent = payload.security;
+  securityElement.textContent = payload.wpa3 ? "WPA3" : payload.security;
   passwordElement.textContent = payload.password ? "Available" : "Open network";
   hiddenElement.textContent = payload.hidden ? "Yes" : "No";
   resultCard.classList.remove("is-empty");

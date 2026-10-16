@@ -16,6 +16,9 @@ struct JoinWifiRequest {
     security: String,
     #[serde(default)]
     hidden: bool,
+    /// The QR code declared WPA3 (`T:SAE` or `T:WPA3`).
+    #[serde(default)]
+    wpa3: bool,
 }
 
 // Hand-written so a stray `{:?}` can never put the password in a log.
@@ -26,6 +29,7 @@ impl std::fmt::Debug for JoinWifiRequest {
             .field("password", &self.password.as_ref().map(|_| "<redacted>"))
             .field("security", &self.security)
             .field("hidden", &self.hidden)
+            .field("wpa3", &self.wpa3)
             .finish()
     }
 }
@@ -184,6 +188,7 @@ fn join_wifi_blocking(
         &security,
         password.as_deref(),
         request.hidden,
+        request.wpa3,
         progress,
     )?;
     log::info!(
@@ -214,6 +219,7 @@ fn join_platform(
     security: &str,
     password: Option<&str>,
     _hidden: bool,
+    _wpa3: bool,
     progress: &dyn Fn(&str),
 ) -> Result<Joined, ErrorResponse> {
     use wifi::CoreWlanError;
@@ -286,9 +292,10 @@ fn join_platform(
     security: &str,
     password: Option<&str>,
     hidden: bool,
+    wpa3: bool,
     progress: &dyn Fn(&str),
 ) -> Result<Joined, ErrorResponse> {
-    let joined = netsh::join_via_netsh(ssid, security, password, hidden, progress)
+    let joined = netsh::join_via_netsh(ssid, security, password, hidden, wpa3, progress)
         .map_err(|message| ErrorResponse { message })?;
     Ok(Joined {
         interface: joined.interface,
@@ -303,6 +310,7 @@ fn join_platform(
     _security: &str,
     _password: Option<&str>,
     _hidden: bool,
+    _wpa3: bool,
     _progress: &dyn Fn(&str),
 ) -> Result<Joined, ErrorResponse> {
     Err(ErrorResponse {
@@ -464,6 +472,7 @@ mod tests {
             password: Some("secret-pass".to_string()),
             security: "wpa".to_string(),
             hidden: false,
+            wpa3: false,
         };
         let debug = format!("{request:?}");
         assert!(debug.contains("Cafe"));
