@@ -42,12 +42,15 @@ pub struct NetshJoin {
 
 /// Join `ssid` by saving a WLAN profile for the current user and connecting
 /// with it. `security` is one of the normalized values "wpa", "wep", "nopass".
+/// `prefer_wpa3` is set when the QR code declared WPA3 (`T:SAE`); it only
+/// decides which profile to try first when the scan can't tell.
 #[cfg(windows)]
 pub fn join_via_netsh(
     ssid: &str,
     security: &str,
     password: Option<&str>,
     hidden: bool,
+    prefer_wpa3: bool,
     progress: &dyn Fn(&str),
 ) -> Result<NetshJoin, String> {
     validate_profile_name(ssid)?;
@@ -64,56 +67,156 @@ pub fn join_via_netsh(
         }
     }
 
-    let security = ProfileSecurity::from_normalized(security);
-    let key = match security.key_type {
-        Some(_) => {
-            Some(password.ok_or_else(|| "Password is required for secured networks.".to_string())?)
-        }
-        None => None,
+    let key = if security == "nopass" {
+        None
+    } else {
+        Some(password.ok_or_else(|| "Password is required for secured networks.".to_string())?)
     };
 
     // A saved profile with this name belongs to the user (or an earlier
     // join). Never overwrite it with QR contents, and never delete it: connect
     // with it as-is and report failure without touching it.
-    let created = !profile_exists(ssid);
-    if created {
-        progress(&format!("Saving the Wi-Fi profile for '{ssid}'..."));
-        add_profile(&profile_xml(ssid, &security, key, hidden))?;
-    } else {
+    if profile_exists(ssid) {
         log::info!("Using the existing Wi-Fi profile for '{ssid}'");
+        return match connect_and_wait(ssid, progress)? {
+            ConnectOutcome::TimedOut => Err(format!(
+                "Could not join '{ssid}' with the Wi-Fi profile already saved on this PC. WiLens left that profile unchanged; forget it in Windows Wi-Fi settings to use the scanned details instead."
+            )),
+            outcome => Ok(outcome.into_join()),
+        };
     }
 
+    let attempts = if security == "wpa" {
+        wpa_attempts(prefer_wpa3, scan_security(ssid))
+    } else {
+        vec![ProfileSecurity::from_normalized(security)]
+    };
+    let mut wpa3_unsupported = false;
+
+    for (index, profile) in attempts.iter().enumerate() {
+        let is_last = index + 1 == attempts.len();
+        if index > 0 {
+            progress(&format!("Trying {} for '{ssid}'...", profile.label()));
+        } else {
+            progress(&format!("Saving the Wi-Fi profile for '{ssid}'..."));
+        }
+
+        // Windows releases before 10 version 2004, and some drivers, refuse a
+        // WPA3SAE profile outright.
+        if let Err(error) = add_profile(&profile_xml(ssid, profile, key, hidden)) {
+            if profile.is_wpa3() {
+                log::warn!("Could not save a WPA3 profile for '{ssid}': {error}");
+                wpa3_unsupported = true;
+                if !is_last {
+                    continue;
+                }
+                return Err(format!(
+                    "'{ssid}' needs WPA3, and this PC could not save a WPA3 Wi-Fi profile. WPA3 needs Windows 10 version 2004 or later and a Wi-Fi adapter that supports it."
+                ));
+            }
+            return Err(error);
+        }
+
+        let outcome = match connect_and_wait(ssid, progress) {
+            Ok(outcome) => outcome,
+            Err(error) => {
+                delete_profile(ssid);
+                return Err(error);
+            }
+        };
+        match outcome {
+            ConnectOutcome::TimedOut => {
+                // Don't leave a profile with a wrong password (or the wrong
+                // security) behind for Windows to keep retrying.
+                delete_profile(ssid);
+            }
+            outcome => return Ok(outcome.into_join()),
+        }
+    }
+
+    let hint = match (key.is_some(), wpa3_unsupported) {
+        (_, true) => " If the network is WPA3-only, this PC may not support WPA3.",
+        (true, false) => " Check that the password is correct.",
+        (false, false) => "",
+    };
+    Err(format!("Could not join '{ssid}'.{hint}"))
+}
+
+/// Profiles to try, in order, for a WPA-family QR code. A WPA2 profile also
+/// joins WPA2/WPA3 transition networks; a WPA3-only network needs WPA3SAE.
+pub fn wpa_attempts(prefer_wpa3: bool, scan: ScanSecurity) -> Vec<ProfileSecurity> {
+    let wpa2 = ProfileSecurity::from_normalized("wpa");
+    let wpa3 = ProfileSecurity::wpa3();
+    match scan {
+        ScanSecurity::Wpa3Only => vec![wpa3],
+        ScanSecurity::Other => vec![wpa2],
+        ScanSecurity::Unknown if prefer_wpa3 => vec![wpa3, wpa2],
+        ScanSecurity::Unknown => vec![wpa2, wpa3],
+    }
+}
+
+#[cfg(windows)]
+fn connect_and_wait(ssid: &str, progress: &dyn Fn(&str)) -> Result<ConnectOutcome, String> {
     progress(&format!("Connecting to '{ssid}'..."));
-    if let Err(error) = netsh(&["wlan", "connect", &format!("name={ssid}")]) {
-        if created {
-            delete_profile(ssid);
+    netsh(&["wlan", "connect", &format!("name={ssid}")])?;
+    Ok(wait_until_connected(ssid))
+}
+
+/// What a Wi-Fi scan says about one network's security.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ScanSecurity {
+    /// Every sighting advertises WPA3 and none WPA2 or older.
+    Wpa3Only,
+    /// Seen, and not WPA3-only.
+    Other,
+    /// Not in the scan, or the scan was refused (no Location access).
+    Unknown,
+}
+
+#[cfg(windows)]
+fn scan_security(ssid: &str) -> ScanSecurity {
+    match netsh(&["wlan", "show", "networks"]) {
+        Ok(output) if !is_location_refusal(&output) => parse_scan_security(&output, ssid),
+        _ => ScanSecurity::Unknown,
+    }
+}
+
+/// Parse `netsh wlan show networks` for `ssid`. Each network is an
+/// `SSID <n> : <name>` line followed by indented `Key : Value` lines. The keys
+/// are localized but the "SSID" label and the "WPA2"/"WPA3" values are not,
+/// so only those are relied on.
+pub fn parse_scan_security(output: &str, ssid: &str) -> ScanSecurity {
+    let mut in_target = false;
+    let mut seen = false;
+    let mut has_wpa3 = false;
+    let mut has_older = false;
+
+    for line in output.lines() {
+        let line = line.trim_end_matches('\r');
+        let Some((key, value)) = line.split_once(" : ") else {
+            continue;
+        };
+        // "BSSID n" lines don't match, so only network headers do.
+        if key.trim().starts_with("SSID ") {
+            in_target = value == ssid;
+            seen |= in_target;
+            continue;
         }
-        return Err(error);
+        if !in_target {
+            continue;
+        }
+        let value = value.trim().to_ascii_uppercase();
+        if value.contains("WPA3") {
+            has_wpa3 = true;
+        } else if value.starts_with("WPA") || value == "WEP" || value == "OPEN" {
+            has_older = true;
+        }
     }
 
-    match wait_until_connected(ssid) {
-        ConnectOutcome::Connected(interface) => Ok(NetshJoin {
-            interface,
-            verified: true,
-        }),
-        ConnectOutcome::Unverifiable => Ok(NetshJoin {
-            interface: "Wi-Fi".to_string(),
-            verified: false,
-        }),
-        ConnectOutcome::TimedOut if created => {
-            // Don't leave a profile with a wrong password behind for Windows
-            // to keep retrying in the background.
-            delete_profile(ssid);
-            let hint = if key.is_some() {
-                " Check that the password is correct."
-            } else {
-                ""
-            };
-            Err(format!("Could not join '{ssid}'.{hint}"))
-        }
-        ConnectOutcome::TimedOut => Err(format!(
-            "Could not join '{ssid}' with the Wi-Fi profile already saved on this PC. WiLens left that profile unchanged; forget it in Windows Wi-Fi settings to use the scanned details instead."
-        )),
+    match (seen, has_wpa3, has_older) {
+        (true, true, false) => ScanSecurity::Wpa3Only,
+        (true, _, _) => ScanSecurity::Other,
+        (false, _, _) => ScanSecurity::Unknown,
     }
 }
 
@@ -122,6 +225,23 @@ enum ConnectOutcome {
     Connected(String),
     Unverifiable,
     TimedOut,
+}
+
+#[cfg(windows)]
+impl ConnectOutcome {
+    /// The successful join for a `Connected` or `Unverifiable` outcome.
+    fn into_join(self) -> NetshJoin {
+        match self {
+            ConnectOutcome::Connected(interface) => NetshJoin {
+                interface,
+                verified: true,
+            },
+            _ => NetshJoin {
+                interface: "Wi-Fi".to_string(),
+                verified: false,
+            },
+        }
+    }
 }
 
 #[cfg(windows)]
@@ -269,8 +389,7 @@ impl ProfileSecurity {
     pub fn from_normalized(security: &str) -> Self {
         match security {
             // WPA2-Personal also connects to WPA2/WPA3 transition networks.
-            // WPA3-only networks need a WPA3SAE profile, which older Windows
-            // releases reject, so they are not supported yet.
+            // WPA3-only networks need `wpa3()` instead.
             "wpa" => Self {
                 authentication: "WPA2PSK",
                 encryption: "AES",
@@ -286,6 +405,27 @@ impl ProfileSecurity {
                 encryption: "none",
                 key_type: None,
             },
+        }
+    }
+
+    /// WPA3-Personal (SAE). Windows 10 version 2004 and later accept it.
+    pub fn wpa3() -> Self {
+        Self {
+            authentication: "WPA3SAE",
+            encryption: "AES",
+            key_type: Some("passPhrase"),
+        }
+    }
+
+    pub fn is_wpa3(&self) -> bool {
+        self.authentication == "WPA3SAE"
+    }
+
+    fn label(&self) -> &'static str {
+        if self.is_wpa3() {
+            "WPA3"
+        } else {
+            "WPA2"
         }
     }
 }
@@ -406,9 +546,69 @@ pub fn parse_interfaces(output: &str) -> InterfaceStatus {
 #[cfg(test)]
 mod tests {
     use super::{
-        is_location_refusal, parse_interfaces, parse_profile_names, profile_xml,
-        validate_profile_name, xml_escape, ProfileSecurity,
+        is_location_refusal, parse_interfaces, parse_profile_names, parse_scan_security,
+        profile_xml, validate_profile_name, wpa_attempts, xml_escape, ProfileSecurity,
+        ScanSecurity,
     };
+
+    const SCAN: &str = "Interface name : Wi-Fi
+There are 3 networks currently visible.
+
+SSID 1 : Home
+    Network type            : Infrastructure
+    Authentication          : WPA3-Personal
+    Encryption              : CCMP
+
+SSID 2 : Cafe
+    Network type            : Infrastructure
+    Authentication          : WPA2-Personal
+    Encryption              : CCMP
+
+SSID 3 : Home 5G
+    Network type            : Infrastructure
+    Authentication          : WPA2-Personal
+    Encryption              : CCMP
+";
+
+    #[test]
+    fn wpa3_profile_uses_sae() {
+        let xml = profile_xml("Home", &ProfileSecurity::wpa3(), Some("pw12345678"), false);
+        assert!(xml.contains("<authentication>WPA3SAE</authentication>"));
+        assert!(xml.contains("<encryption>AES</encryption>"));
+        assert!(xml.contains("<keyType>passPhrase</keyType>"));
+    }
+
+    #[test]
+    fn reads_network_security_from_scan() {
+        assert_eq!(parse_scan_security(SCAN, "Home"), ScanSecurity::Wpa3Only);
+        assert_eq!(parse_scan_security(SCAN, "Cafe"), ScanSecurity::Other);
+        assert_eq!(parse_scan_security(SCAN, "Home 5G"), ScanSecurity::Other);
+        assert_eq!(parse_scan_security(SCAN, "Missing"), ScanSecurity::Unknown);
+    }
+
+    #[test]
+    fn a_network_seen_with_wpa2_anywhere_is_not_wpa3_only() {
+        let scan = "SSID 1 : Mesh
+    Authentication : WPA3-Personal
+SSID 2 : Mesh
+    Authentication : WPA2-Personal
+";
+        assert_eq!(parse_scan_security(scan, "Mesh"), ScanSecurity::Other);
+    }
+
+    #[test]
+    fn tries_profiles_in_the_right_order() {
+        let order = |prefer, scan| {
+            wpa_attempts(prefer, scan)
+                .iter()
+                .map(ProfileSecurity::is_wpa3)
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(order(false, ScanSecurity::Wpa3Only), vec![true]);
+        assert_eq!(order(true, ScanSecurity::Other), vec![false]);
+        assert_eq!(order(false, ScanSecurity::Unknown), vec![false, true]);
+        assert_eq!(order(true, ScanSecurity::Unknown), vec![true, false]);
+    }
 
     #[test]
     fn wpa_profile_has_passphrase_and_hex_ssid() {
