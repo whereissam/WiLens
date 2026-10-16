@@ -245,7 +245,7 @@ const Demo: React.FC = () => {
   );
 };
 
-const CHECK_STEPS = ["Wi-Fi link", "Router", "DNS", "Internet"];
+const CHECK_STEPS = ["Network connection", "Router", "Website names (DNS)", "Internet"];
 const SHARE_PAYLOAD = `WIFI:T:WPA;S:${SSID};P:welcome-to-the-studio;;`;
 
 const Card: React.FC<{ t: number; delay: number; label: string; title: string; sub: string; children: React.ReactNode }> = ({

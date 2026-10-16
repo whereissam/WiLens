@@ -2,7 +2,11 @@
 
 ## Open the App
 
-If you already built the app locally, open it with:
+Install WiLens from the
+[Releases page](https://github.com/whereissam/WiLens/releases/latest), or open
+a local build.
+
+**macOS:**
 
 ```bash
 open src-tauri/target/release/bundle/macos/WiLens.app
@@ -15,9 +19,15 @@ If macOS blocks first launch:
 3. Right-click `WiLens.app`.
 4. Choose `Open`.
 
+**Windows:** run `WiLens-setup.exe` to install it, or start
+`src-tauri\target\release\wilens.exe` directly without installing. The
+installer isn't signed yet, so SmartScreen asks first: choose
+**More info → Run anyway**.
+
 ## What WiLens Does
 
-WiLens scans a Wi-Fi QR code and helps your Mac join that network.
+WiLens scans a Wi-Fi QR code and helps your computer join that network. It
+supports WPA2, WPA3, WEP, and open networks.
 
 Supported QR format:
 
@@ -25,16 +35,18 @@ Supported QR format:
 WIFI:T:WPA;S:MyWifi;P:mypassword;;
 ```
 
+`T:SAE` and `T:WPA3` codes (WPA3, as made by Android phones) work too.
+
 ## How To Use It
 
 1. Open WiLens.
 2. Click `Start camera`.
-3. Allow camera access if macOS asks.
+3. Allow camera access if your system asks.
 4. Point the camera at a Wi-Fi QR code.
 5. Wait for WiLens to detect the network.
 6. Review the scanned network details.
 7. Click `Join network`.
-8. Approve any macOS prompt if shown.
+8. On macOS, approve any system prompt if shown.
 
 No camera handy? Click `Scan an image…`, drop a picture of the QR code onto the
 window, or paste one with Cmd+V (Ctrl+V on Windows). Pasting the `WIFI:` text
@@ -83,15 +95,36 @@ WiLens may trigger system prompts for:
   name and password. Secured networks need Location access so WiLens can check
   the network's security; otherwise use Copy password below.
 
+## Windows Settings
+
+Windows doesn't always ask; desktop apps follow these switches in
+**Settings → Privacy & security**:
+
+- **Camera → Let desktop apps access your camera** — needed to scan with the
+  camera. Scanning from a picture works without it.
+- **Location → Let desktop apps access your location** — optional. On
+  Windows 11 24H2 and later, WiLens needs it to confirm that a join worked and
+  to read a network's security from a Wi-Fi scan. Without it WiLens still
+  joins, but may say it "could not confirm the connection"; check the Wi-Fi
+  icon in the taskbar.
+
+WiLens never needs administrator rights on Windows. It saves a Wi-Fi profile
+for your account only and connects with it.
+
 ## Copy Password Fallback
 
-If joining does not work as expected, use `Copy password` and connect manually from macOS Wi-Fi settings.
+If joining does not work as expected, use `Copy password` and connect manually
+from your system's Wi-Fi settings.
 
 ## Troubleshooting
 
 ### Camera does not start
 
-- Check macOS camera permissions for the app.
+- **macOS:** check the app's camera permission in System Settings → Privacy &
+  Security → Camera.
+- **Windows:** turn on Settings → Privacy & security → Camera → Let desktop
+  apps access your camera, and close other apps using the camera.
+- No camera? Scan from a picture instead (see above).
 - Restart the app and try again.
 
 ### QR code is not detected
@@ -103,7 +136,13 @@ If joining does not work as expected, use `Copy password` and connect manually f
 ### Network join fails
 
 - Verify the QR code uses the correct SSID and password.
-- Check whether macOS showed an approval dialog behind the app.
+- **macOS:** check whether macOS showed an approval dialog behind the app.
+- **Windows:** if this PC already has a saved network with the same name,
+  WiLens uses that saved profile and won't change it. If its password is out of
+  date, forget the network in Windows Wi-Fi settings and scan again.
+- **Windows:** WPA3-only networks need Windows 10 version 2004 or later and a
+  Wi-Fi adapter that supports WPA3.
+- **Windows:** network names containing `*`, `?`, or `"` can't be joined.
 - Try manual connection using the copied password.
 
 ### App says success but macOS showed a prompt
