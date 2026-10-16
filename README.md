@@ -100,8 +100,22 @@ locally (ad-hoc signed) in one step:
 bun run release:dmg
 ```
 
-Build the Windows installer (`WiLens-setup.exe`) from a Mac by
-cross-compiling. One-time setup:
+Build the Windows installer on Windows (needs Rust, Bun, and the Visual Studio
+C++ Build Tools — see the
+[Tauri prerequisites](https://tauri.app/start/prerequisites/)):
+
+```powershell
+bun install
+bun run tauri build --bundles nsis
+```
+
+The installer lands in `src-tauri\target\release\bundle\nsis\WiLens_<version>_x64-setup.exe`.
+On Windows, WiLens needs **Settings → Privacy & security → Camera → Let desktop
+apps access your camera** to scan, and works best with **Location → Let desktop
+apps access your location** turned on so it can confirm a join (Windows 11 24H2
+and later).
+
+Or build it from a Mac by cross-compiling. One-time setup:
 
 ```bash
 brew install nsis llvm lld
