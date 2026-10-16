@@ -3,6 +3,16 @@
 All notable changes to WiLens. Releases are published on the
 [Releases page](https://github.com/whereissam/WiLens/releases).
 
+## Unreleased
+
+### New
+
+- **WPA3 on Windows.** WiLens now joins WPA3-only networks on Windows 10
+  version 2004 and later. It reads the network's security from a Wi-Fi scan
+  and saves a WPA3 profile when needed; if the scan can't tell (for example
+  without Location access), it tries WPA3 first for `T:SAE` codes and WPA2
+  first otherwise. The network details now show "WPA3" for those codes.
+
 ## 0.2.0 — Connect, Share, Check
 
 WiLens grows from a QR scanner into a small Wi-Fi companion: join a network,
