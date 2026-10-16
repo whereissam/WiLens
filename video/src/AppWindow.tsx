@@ -172,6 +172,17 @@ export const AppWindow: React.FC<{ t: number }> = ({ t }) => {
               <Img src={staticFile("wilen-logo.png")} alt="" className="hero-logo" />
               <p className="eyebrow">macOS Wi-Fi QR utility</p>
             </div>
+            <div className="mode-switch" role="tablist">
+              <button className="mode-tab" role="tab" aria-selected="true">
+                Join a network
+              </button>
+              <button className="mode-tab" role="tab" aria-selected="false" disabled={joining}>
+                Share a network
+              </button>
+              <button className="mode-tab" role="tab" aria-selected="false">
+                Check connection
+              </button>
+            </div>
             <h1>Point your camera at a Wi-Fi QR code.</h1>
             <p className="lede">
               WiLens scans the code, extracts the network details, and lets you join from a single desktop window.
@@ -181,10 +192,14 @@ export const AppWindow: React.FC<{ t: number }> = ({ t }) => {
                 Start camera
                 <Cursor t={t} arrive={APP.clickStart - 0.1} click={APP.clickStart} />
               </button>
-              <button className="button button-secondary" disabled={busy || !decoded}>
+              <button className="button button-secondary" disabled={busy || t < APP.clickStart}>
                 Scan again
               </button>
+              <button className="button button-secondary">Scan an image…</button>
             </div>
+            <p className="hint">
+              No camera handy? Drop or paste a picture of the QR code, or paste its <code>WIFI:</code> text.
+            </p>
             <p className="status" role="status">
               {status}
             </p>
@@ -215,8 +230,9 @@ export const AppWindow: React.FC<{ t: number }> = ({ t }) => {
               </dl>
               <p className="system-note">
                 macOS requires Location access to scan for Wi-Fi networks, so it asks the first time — WiLens never
-                tracks your location. If the quick join can't connect, it falls back to <code>networksetup</code>,
-                which may show a macOS administrator prompt.
+                tracks your location. It uses the scan to check the network matches the QR code. Without Location
+                access WiLens can still join open networks; for secured ones, copy the password and join from the
+                Wi-Fi menu.
               </p>
               <div className="result-actions">
                 <button
