@@ -3,6 +3,7 @@ import MainLayout from "../layouts/MainLayout.astro";
 
 const githubHref = "https://github.com/whereissam/WiLens";
 const downloadHref = `${githubHref}/releases/latest/download/WiLens.dmg`;
+const windowsHref = `${githubHref}/releases/latest/download/WiLens-setup.exe`;
 const quarantineCommand = "xattr -dr com.apple.quarantine /Applications/WiLens.app";
 
 // A deterministic, QR-looking 21x21 grid: three finder squares plus noise.
@@ -40,6 +41,21 @@ const installSteps = [
   {
     title: "Allow it",
     text: "System Settings → Privacy & Security → scroll down → Open Anyway.",
+  },
+];
+
+const windowsSteps = [
+  {
+    title: "Run the installer",
+    text: "Open WiLens-setup.exe. It isn't signed yet, so SmartScreen asks first: More info → Run anyway.",
+  },
+  {
+    title: "Allow the camera",
+    text: "Settings → Privacy & security → Camera → Let desktop apps access your camera.",
+  },
+  {
+    title: "Optional: Location",
+    text: "Turn on Let desktop apps access your location so WiLens can confirm the join (Windows 11 24H2+).",
   },
 ];
 
@@ -114,9 +130,10 @@ const notes = [
             <span class="shutter-dot" aria-hidden="true"></span>
             Download for macOS
           </a>
+          <a class="text-link" href={windowsHref}>Windows (beta) →</a>
           <a class="text-link" href={githubHref}>View the source →</a>
         </div>
-        <p class="meta">Apple Silicon · free · MIT · Windows build in beta</p>
+        <p class="meta">Apple Silicon · Windows x64 (beta) · free · MIT</p>
       </div>
 
       <div class="camera" aria-hidden="true">
@@ -214,13 +231,15 @@ const notes = [
         <p>
           WiLens is a side project, so it isn't notarized by Apple (that costs
           $99 a year). macOS asks you to confirm the first launch. It takes
-          about ten seconds.
+          about ten seconds. On Windows, the installer is unsigned for now, so
+          SmartScreen asks once too.
         </p>
         <div class="actions">
           <a class="shutter" href={downloadHref}>
             <span class="shutter-dot" aria-hidden="true"></span>
             Download WiLens.dmg
           </a>
+          <a class="text-link" href={windowsHref}>WiLens-setup.exe (Windows) →</a>
           <a class="text-link" href={`${githubHref}/releases`}>All releases →</a>
         </div>
       </div>
@@ -241,6 +260,15 @@ const notes = [
           <code>{quarantineCommand}</code>
           <button type="button" data-copy={quarantineCommand}>copy</button>
         </div>
+        <p class="receipt-head">INSTALL · WINDOWS X64 (BETA)</p>
+        <ol>
+          {windowsSteps.map((step) => (
+            <li>
+              <strong>{step.title}</strong>
+              <span>{step.text}</span>
+            </li>
+          ))}
+        </ol>
         <p class="receipt-foot">THANK YOU · COME AGAIN</p>
       </div>
     </section>
