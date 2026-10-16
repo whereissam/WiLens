@@ -3,16 +3,6 @@
 All notable changes to WiLens. Releases are published on the
 [Releases page](https://github.com/whereissam/WiLens/releases).
 
-## Unreleased
-
-### New
-
-- **WPA3 on Windows.** WiLens now joins WPA3-only networks on Windows 10
-  version 2004 and later. It reads the network's security from a Wi-Fi scan
-  and saves a WPA3 profile when needed; if the scan can't tell (for example
-  without Location access), it tries WPA3 first for `T:SAE` codes and WPA2
-  first otherwise. The network details now show "WPA3" for those codes.
-
 ## 0.2.0 — Connect, Share, Check
 
 WiLens grows from a QR scanner into a small Wi-Fi companion: join a network,
@@ -32,8 +22,13 @@ share one, and find out why the internet isn't working.
   OS uses to detect sign-in pages.
 - **Scan without a camera.** Scan a QR code from an image file, drop it on
   the window, or paste it (or its `WIFI:` text) with Cmd/Ctrl+V.
-- **Windows (experimental).** A Windows installer (`WiLens-setup.exe`) that
-  joins through a per-user Wi-Fi profile with no administrator prompt.
+- **Windows (beta).** A Windows installer (`WiLens-setup.exe`) that joins
+  through a per-user Wi-Fi profile with no administrator prompt. It joins
+  WPA3-only networks on Windows 10 version 2004 and later: WiLens reads the
+  network's security from a Wi-Fi scan and saves a WPA3 profile when needed.
+  If the scan can't tell (for example without Location access), it tries
+  WPA3 first for `T:SAE` codes and WPA2 first otherwise.
+- WPA3 QR codes (`T:SAE`, `T:WPA3`) show "WPA3" in the network details.
 - After a failed join, a **Check connection** button runs the check
   straight away.
 
@@ -59,6 +54,9 @@ From a full security audit of the app:
 - Joins over the fallback now say when they couldn't be confirmed, instead
   of always reporting success.
 - Network names with leading or trailing spaces join correctly on Windows.
+- On Windows, camera errors name the setting to turn on, and a missing or
+  busy camera gets its own message. A join that can't be confirmed points to
+  the Location setting Windows 11 24H2 and later need.
 
 ### Known limitations
 
@@ -66,8 +64,9 @@ From a full security audit of the app:
   launch (System Settings → Privacy & Security → Open Anyway).
 - Joining a secured network on macOS needs Location access, so WiLens can
   check the network's security.
-- Enterprise (802.1X / EAP) networks are not supported. WPA3-only networks
-  are not supported on Windows yet.
+- Enterprise (802.1X / EAP) networks are not supported.
+- The Windows installer is not signed yet, so SmartScreen asks first
+  (More info → Run anyway).
 
 ## 0.1.2 — Faster, clearer Wi-Fi joins
 
