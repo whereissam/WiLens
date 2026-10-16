@@ -5,6 +5,9 @@ export interface WifiPayload {
   password?: string;
   security: WifiSecurity;
   hidden: boolean;
+  /** The code declared WPA3 (`T:SAE` or `T:WPA3`); joins as WPA, but Windows
+   * tries a WPA3 profile first. */
+  wpa3: boolean;
   raw: string;
 }
 
@@ -44,6 +47,7 @@ export function parseWifiQr(raw: string): WifiPayload {
   const security =
     rawType === "" ? (password ? "WPA" : "nopass") : normalizeSecurity(rawType);
   const hidden = (values.get("H") ?? "").toLowerCase() === "true";
+  const wpa3 = ["SAE", "WPA3"].includes(rawType.toUpperCase());
 
   if (security !== "nopass" && !password) {
     throw new Error("Wi-Fi QR code is missing the password.");
@@ -54,6 +58,7 @@ export function parseWifiQr(raw: string): WifiPayload {
     password: security === "nopass" ? undefined : password,
     security,
     hidden,
+    wpa3,
     raw,
   };
 }

@@ -188,6 +188,7 @@ Several behaviors depend on the OS and can't be proven in CI.
 - [ ] macOS: a same-name open network is refused when the QR declares WPA.
 - [ ] Windows 10 and 11: first join creates a profile; re-scan reuses it; a saved profile is never overwritten.
 - [ ] Windows: a network name with `*` or `?` is refused.
+- [ ] Windows: join a WPA3-only network from a `T:SAE` and a `T:WPA` code, with Location on and off.
 - [ ] Windows 11 24H2 with Location denied: join reports "could not confirm" and doesn't delete the profile.
 - [ ] Share: save a PNG, scan it with iPhone and Android cameras, and confirm both offer to join.
 - [ ] Check: working network, Wi-Fi off, router unplugged from the internet, and a hotel/café sign-in page.
@@ -198,7 +199,7 @@ Several behaviors depend on the OS and can't be proven in CI.
 - [x] Scan a QR code from an image file, the clipboard, or drag-and-drop (no camera needed). *(#60)*
 - [ ] Scan a QR code shown on screen (e.g. a code in a chat or a PDF).
 - [x] After a failed join, offer **Check connection** with one click. *(#60)*
-- [ ] Windows: support WPA3-only networks (`WPA3SAE` profile) where the OS allows it.
+- [x] Windows: support WPA3-only networks (`WPA3SAE` profile) where the OS allows it.
 - [ ] Windows: replace `netsh` with the Native Wifi API (`WlanSetProfile`, `WlanConnect`) for non-localized results and literal profile names.
 - [ ] macOS: handle hidden networks explicitly (`includeHidden` scan plus a clearer "not found" message).
 - [ ] Explain common failures in plain language (wrong password, network out of range, enterprise network not supported).

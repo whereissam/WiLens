@@ -55,7 +55,7 @@ shasum -a 256 -c WiLens.dmg.sha256
 **Windows (x64, experimental):** releases also include `WiLens-setup.exe`,
 which joins Wi-Fi through a per-user `netsh wlan` profile (no administrator
 prompt). It is unsigned, so SmartScreen asks first — choose **More info → Run
-anyway**. WPA3-only networks are not supported yet.
+anyway**. WPA3-only networks need Windows 10 version 2004 or later.
 
 ## Current Status
 
