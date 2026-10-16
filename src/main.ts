@@ -712,7 +712,18 @@ function toggleControls(): void {
 
 function getCameraErrorMessage(error: unknown): string {
   if (error instanceof DOMException && error.name === "NotAllowedError") {
-    return "Camera permission was denied.";
+    return isWindows
+      ? "Camera permission was denied. Turn on Settings > Privacy & security > Camera > Let desktop apps access your camera, then try again."
+      : "Camera permission was denied.";
+  }
+
+  // Desktop PCs often have no webcam; point to the camera-free options.
+  if (error instanceof DOMException && error.name === "NotFoundError") {
+    return "No camera found. Drop or paste a picture of the QR code instead.";
+  }
+
+  if (error instanceof DOMException && error.name === "NotReadableError") {
+    return "The camera is in use by another app. Close it and try again.";
   }
 
   return getErrorMessage(error, "Unable to start the scanner.");
