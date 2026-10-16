@@ -1,17 +1,20 @@
 import { AbsoluteFill, Easing, Img, interpolate, Sequence, staticFile, useCurrentFrame } from "remotion";
 import { APP, AppWindow, SSID } from "./AppWindow";
 import { FPS, lerp, prog, s, visible } from "./anim";
+import { QrCode } from "./QrCode";
 
 const FONT = '"SF Pro Display", "Segoe UI", sans-serif';
 const MONO = '"SF Mono", Menlo, monospace';
 const MIST = "#ecf3ef";
 const MIST_DIM = "rgba(236,243,239,.68)";
 const GOLD = "#f1d77a";
+const MINT = "#8fdcb1";
 
 const HOOK_END = 3.6;
 const TURN_END = 6.2;
 const APP_END = 20.2;
-export const INTRO_FRAMES = s(25.5);
+const MORE_END = 25.4;
+export const INTRO_FRAMES = s(30.7);
 
 const background =
   "radial-gradient(circle at 10% 0%, rgba(62,111,88,.42), transparent 38%)," +
@@ -173,9 +176,9 @@ const MenuBar: React.FC<{ t: number }> = ({ t }) => {
 };
 
 const CAPTIONS: [number, number, string, string, string][] = [
-  [0.8, 5.2, "1", "Scan the code", "Point your Mac’s camera at any Wi-Fi QR code."],
+  [0.8, 5.2, "1", "Scan the code", "Use your camera, or drop in a picture of the code."],
   [5.3, 7.6, "2", "Check before you join", "See the network, its security, and whether it’s hidden."],
-  [7.7, 13.6, "3", "Join in one click", "No typing passwords."],
+  [7.7, 13.6, "3", "Join in one click", "No typing passwords. WPA2 and WPA3."],
 ];
 
 /** Scene 3: the real app, walked through scan → check → join. */
@@ -242,7 +245,100 @@ const Demo: React.FC = () => {
   );
 };
 
-/** Scene 4: name, promise, where to get it. */
+const CHECK_STEPS = ["Wi-Fi link", "Router", "DNS", "Internet"];
+const SHARE_PAYLOAD = `WIFI:T:WPA;S:${SSID};P:welcome-to-the-studio;;`;
+
+const Card: React.FC<{ t: number; delay: number; label: string; title: string; sub: string; children: React.ReactNode }> = ({
+  t,
+  delay,
+  label,
+  title,
+  sub,
+  children,
+}) => {
+  const k = prog(t, delay, delay + 0.7);
+  return (
+    <div
+      style={{
+        width: 660,
+        height: 560,
+        padding: "40px 44px",
+        borderRadius: 32,
+        background: "rgba(6,13,11,.55)",
+        border: "1px solid rgba(255,255,255,.1)",
+        display: "flex",
+        flexDirection: "column",
+        opacity: k,
+        transform: `translateY(${(1 - k) * 40}px)`,
+      }}
+    >
+      <div style={{ fontFamily: MONO, fontSize: 22, color: GOLD, letterSpacing: "0.12em" }}>{label}</div>
+      <div style={{ fontSize: 46, fontWeight: 700, letterSpacing: "-0.03em", marginTop: 14 }}>{title}</div>
+      <div style={{ fontSize: 24, color: MIST_DIM, marginTop: 10 }}>{sub}</div>
+      <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>{children}</div>
+    </div>
+  );
+};
+
+/** Scene 4: the other two modes, Share and Check. */
+const More: React.FC = () => {
+  const t = useCurrentFrame() / FPS;
+  const dur = MORE_END - APP_END;
+  const qr = prog(t, 1.0, 1.8);
+  const allGood = prog(t, 1.6 + CHECK_STEPS.length * 0.45, 2.0 + CHECK_STEPS.length * 0.45);
+  return (
+    <AbsoluteFill
+      style={{
+        opacity: visible(t, 0, dur, 0.4, 0.5),
+        fontFamily: FONT,
+        color: MIST,
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 48,
+      }}
+    >
+      <div style={{ fontSize: 64, fontWeight: 700, letterSpacing: "-0.03em", opacity: prog(t, 0, 0.5) }}>And two more things.</div>
+      <div style={{ display: "flex", gap: 48 }}>
+        <Card t={t} delay={0.3} label="SHARE" title="Make a code for guests" sub="Type your network once. Save the QR as an image.">
+          <div style={{ opacity: qr, transform: `scale(${lerp(0.85, 1, qr)})`, borderRadius: 16, overflow: "hidden" }}>
+            <QrCode text={SHARE_PAYLOAD} size={250} />
+          </div>
+        </Card>
+        <Card t={t} delay={0.65} label="CHECK" title="Find out what’s wrong" sub="Link, router, DNS, internet, in plain words.">
+          <div style={{ display: "flex", flexDirection: "column", gap: 16, width: "100%" }}>
+            {CHECK_STEPS.map((step, i) => {
+              const done = prog(t, 1.6 + i * 0.45, 1.9 + i * 0.45);
+              return (
+                <div key={step} style={{ display: "flex", alignItems: "center", gap: 18, fontSize: 30 }}>
+                  <span
+                    style={{
+                      width: 38,
+                      height: 38,
+                      borderRadius: 999,
+                      border: `3px solid ${done > 0 ? MINT : "rgba(255,255,255,.25)"}`,
+                      color: MINT,
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: 24,
+                      fontWeight: 800,
+                    }}
+                  >
+                    <span style={{ opacity: done, transform: `scale(${lerp(0.4, 1, done)})` }}>✓</span>
+                  </span>
+                  <span style={{ opacity: lerp(0.5, 1, done) }}>{step}</span>
+                </div>
+              );
+            })}
+            <div style={{ fontSize: 26, color: MINT, marginTop: 8, opacity: allGood }}>All good. You’re online.</div>
+          </div>
+        </Card>
+      </div>
+    </AbsoluteFill>
+  );
+};
+
+/** Scene 5: name, promise, where to get it. */
 const Outro: React.FC = () => {
   const t = useCurrentFrame() / FPS;
   const rise = (from: number) => {
@@ -260,7 +356,7 @@ const Outro: React.FC = () => {
         Scan a Wi-Fi QR code. You’re online.
       </div>
       <div style={{ display: "flex", gap: 16, marginTop: 44, ...rise(1.1) }}>
-        {["macOS · Apple Silicon", "Windows (experimental)", "Free & open source"].map((chip) => (
+        {["macOS · Apple Silicon", "Windows x64 (beta)", "Free & open source"].map((chip) => (
           <span key={chip} style={{ fontSize: 22, padding: "10px 22px", borderRadius: 999, border: "1px solid rgba(241,215,122,.45)", color: GOLD }}>
             {chip}
           </span>
@@ -282,7 +378,10 @@ export const WiLensIntro: React.FC = () => (
     <Sequence from={s(TURN_END)} durationInFrames={s(APP_END - TURN_END)}>
       <Demo />
     </Sequence>
-    <Sequence from={s(APP_END)}>
+    <Sequence from={s(APP_END)} durationInFrames={s(MORE_END - APP_END)}>
+      <More />
+    </Sequence>
+    <Sequence from={s(MORE_END)}>
       <Outro />
     </Sequence>
   </AbsoluteFill>
