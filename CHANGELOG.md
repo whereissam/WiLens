@@ -3,6 +3,15 @@
 All notable changes to WiLens. Releases are published on the
 [Releases page](https://github.com/whereissam/WiLens/releases).
 
+## Unreleased
+
+### Fixed
+
+- **macOS: joining failed with "tmpErr" even with the right password.**
+  WiLens now tries the strongest access point for the network name first,
+  scans again and moves to the next one after an error, and only suggests
+  checking the password when the network actually rejected it.
+
 ## 0.2.0 — Connect, Share, Check
 
 WiLens grows from a QR scanner into a small Wi-Fi companion: join a network,
