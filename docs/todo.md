@@ -203,6 +203,8 @@ Several behaviors depend on the OS and can't be proven in CI.
 - [ ] Windows: replace `netsh` with the Native Wifi API (`WlanSetProfile`, `WlanConnect`) for non-localized results and literal profile names.
 - [ ] macOS: handle hidden networks explicitly (`includeHidden` scan plus a clearer "not found" message).
 - [ ] Explain common failures in plain language (wrong password, network out of range, enterprise network not supported).
+- [x] macOS: a correct password failed with `tmpErr` and "Check that the password is correct". 2026-11-04, `fix/corewlan-join-scan`: `wifi.rs` tries the strongest matching access point first, rescans and moves to the next one after an associate error, logs the CoreWLAN error code and the access point's channel/band/signal, and only blames the password for authentication errors.
+- [ ] macOS: confirm on the network that failed (`608`) that the join now works; if not, the log now names the error code and access point to go on.
 
 ## Phase 14: Share Improvements
 

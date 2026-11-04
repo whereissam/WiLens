@@ -114,8 +114,11 @@ pub fn join_via_corewlan(
         }
 
         progress(&format!("Looking for '{ssid}'..."));
-        let network = find_network(&interface, ssid, security)?;
+        let mut candidates = find_networks(&interface, ssid, security)?;
+        let mut candidate = 0;
         let ns_password = password.map(NSString::from_str);
+        let mut auth_failures = 0;
+        let mut last_error: Option<(String, isize)> = None;
 
         for attempt in 1..=COREWLAN_MAX_ATTEMPTS {
             progress(&if attempt == 1 {
@@ -124,24 +127,50 @@ pub fn join_via_corewlan(
                 format!("Connecting to '{ssid}' (attempt {attempt} of {COREWLAN_MAX_ATTEMPTS})...")
             });
 
+            let index = candidate % candidates.len();
+            let network = &candidates[index];
+            let described = describe_network(network);
+            log::info!(
+                "CoreWLAN attempt {attempt}: access point {} of {} ({described})",
+                index + 1,
+                candidates.len()
+            );
+
             if let Err(err) =
-                interface.associateToNetwork_password_error(&network, ns_password.as_deref())
+                interface.associateToNetwork_password_error(network, ns_password.as_deref())
             {
-                // One retry covers a transient failure; a second error is
-                // almost always the network refusing us (wrong password).
-                if attempt == 1 {
-                    log::info!("CoreWLAN associate attempt 1 failed; retrying once");
-                    continue;
+                let code = err.code();
+                let detail = nserror_message(&err);
+                log::warn!(
+                    "CoreWLAN associate attempt {attempt} failed: {} code {code} ({detail}) on {described}",
+                    err.domain()
+                );
+                if is_auth_failure(code) {
+                    auth_failures += 1;
+                    // Two authentication errors mean the network refused the
+                    // key; the fallback would only repeat that, slowly.
+                    if auth_failures >= 2 {
+                        return Err(CoreWlanError::Rejected(join_failure_message(
+                            ssid,
+                            &detail,
+                            code,
+                            password.is_some(),
+                        )));
+                    }
                 }
-                let hint = if password.is_some() {
-                    " Check that the password is correct."
-                } else {
-                    ""
-                };
-                return Err(CoreWlanError::Rejected(format!(
-                    "Could not join '{ssid}': {}.{hint}",
-                    nserror_message(&err)
-                )));
+                last_error = Some((detail, code));
+
+                // A scan result can go stale, and the first copy of the name
+                // may be a weak or far access point. Rescan and move on to the
+                // next strongest one instead of repeating the same request.
+                if attempt < COREWLAN_MAX_ATTEMPTS {
+                    progress(&format!("Looking for '{ssid}' again..."));
+                    if let Ok(fresh) = find_networks(&interface, ssid, security) {
+                        candidates = fresh;
+                    }
+                    candidate += 1;
+                }
+                continue;
             }
 
             if wait_until_connected(&interface, ssid) {
@@ -152,26 +181,32 @@ pub fn join_via_corewlan(
             log::info!("CoreWLAN associate attempt {attempt} did not connect; retrying");
         }
 
-        Err(CoreWlanError::Unavailable(format!(
-            "Associated with '{ssid}' but the connection did not come up."
-        )))
+        Err(CoreWlanError::Unavailable(match last_error {
+            Some((detail, code)) => join_failure_message(ssid, &detail, code, password.is_some()),
+            None => format!("Associated with '{ssid}' but the connection did not come up."),
+        }))
     }
 }
 
-/// Scan for `ssid` and return a network whose security matches `security`,
-/// retrying once because a scan can miss a network that is in range (or fail
-/// transiently while the radio is busy).
+/// Scan for `ssid` and return every access point whose security matches
+/// `security`, strongest signal first. Retries the scan once because a scan
+/// can miss a network that is in range (or fail transiently while the radio is
+/// busy).
+///
+/// One network name is usually several access points (2.4 and 5 GHz radios,
+/// mesh nodes). Taking whichever one the scan lists first can pick a weak or
+/// far radio that refuses the join, while the Wi-Fi menu picks the best one.
 ///
 /// Anyone can broadcast any SSID, so the name alone does not identify the
 /// network the QR code describes. If the only networks with that name use a
 /// different security type, the join is refused as `Rejected` so the
 /// networksetup fallback (which cannot check security) does not join it either.
 #[cfg(target_os = "macos")]
-fn find_network(
+fn find_networks(
     interface: &CWInterface,
     ssid: &str,
     security: &str,
-) -> Result<objc2::rc::Retained<CWNetwork>, CoreWlanError> {
+) -> Result<Vec<objc2::rc::Retained<CWNetwork>>, CoreWlanError> {
     let ns_ssid = NSString::from_str(ssid);
     let accepted = accepted_securities(security);
     let mut last_error = format!("Network '{ssid}' was not found in range.");
@@ -181,14 +216,21 @@ fn find_network(
         match unsafe { interface.scanForNetworksWithName_includeHidden_error(Some(&ns_ssid), true) }
         {
             Ok(networks) => {
+                let mut matching = Vec::new();
                 for network in networks.iter() {
                     if accepted
                         .iter()
                         .any(|mode| unsafe { network.supportsSecurity(*mode) })
                     {
-                        return Ok(network);
+                        let rssi = unsafe { network.rssiValue() };
+                        matching.push((network, rssi));
+                    } else {
+                        saw_mismatch = true;
                     }
-                    saw_mismatch = true;
+                }
+                if !matching.is_empty() {
+                    log::info!("Scan found {} matching access point(s)", matching.len());
+                    return Ok(strongest_first(matching));
                 }
             }
             Err(err) => last_error = nserror_message(&err),
@@ -201,6 +243,61 @@ fn find_network(
         )));
     }
     Err(CoreWlanError::Unavailable(last_error))
+}
+
+/// Channel, band and signal of a scanned access point, for the log. Leaves out
+/// the BSSID and the network name.
+#[cfg(target_os = "macos")]
+fn describe_network(network: &CWNetwork) -> String {
+    use objc2_core_wlan::CWChannelBand;
+    unsafe {
+        let channel = match network.wlanChannel() {
+            Some(channel) => {
+                let band = match channel.channelBand() {
+                    CWChannelBand::Band2GHz => "2.4 GHz",
+                    CWChannelBand::Band5GHz => "5 GHz",
+                    CWChannelBand::Band6GHz => "6 GHz",
+                    _ => "unknown band",
+                };
+                format!("channel {} {band}", channel.channelNumber())
+            }
+            None => "unknown channel".to_string(),
+        };
+        format!("{channel}, {} dBm", network.rssiValue())
+    }
+}
+
+/// Order scanned access points strongest signal first (RSSI is in dBm, so
+/// closer to zero is stronger). Equal signals keep the scan's order.
+#[cfg(any(target_os = "macos", test))]
+fn strongest_first<T>(mut networks: Vec<(T, isize)>) -> Vec<T> {
+    networks.sort_by_key(|(_, rssi)| std::cmp::Reverse(*rssi));
+    networks.into_iter().map(|(network, _)| network).collect()
+}
+
+/// CoreWLAN error codes that mean the network refused the key: an EAPOL
+/// (4-way handshake) failure, a bad PMK, a failed challenge, or the supplicant
+/// timing out during the handshake. Other codes, such as -3900 ("tmpErr") or
+/// -3906, are general failures and say nothing about the password.
+#[cfg(any(target_os = "macos", test))]
+fn is_auth_failure(code: isize) -> bool {
+    matches!(code, 1 | -3912 | -3924 | -3925)
+}
+
+/// User-facing message for a failed CoreWLAN join. Only an authentication
+/// error suggests checking the password.
+#[cfg(any(target_os = "macos", test))]
+fn join_failure_message(ssid: &str, detail: &str, code: isize, has_password: bool) -> String {
+    if has_password && is_auth_failure(code) {
+        format!(
+            "Could not join '{ssid}': the network did not accept the password (error {code}). Check that the password is correct."
+        )
+    } else {
+        let detail = detail.trim_end_matches('.');
+        format!(
+            "Could not join '{ssid}': {detail} (error {code}). Try again closer to the router, or copy the password and join from the Wi-Fi menu."
+        )
+    }
 }
 
 /// Poll the interface's current SSID until it matches `ssid` or the timeout
@@ -332,7 +429,47 @@ pub fn parse_hardware_ports(output: &str) -> Vec<HardwarePort> {
 
 #[cfg(test)]
 mod tests {
-    use super::{parse_hardware_ports, reports_failure};
+    use super::{
+        is_auth_failure, join_failure_message, parse_hardware_ports, reports_failure,
+        strongest_first,
+    };
+
+    #[test]
+    fn orders_access_points_strongest_first() {
+        let ordered = strongest_first(vec![
+            ("far", -80),
+            ("near", -40),
+            ("mid", -60),
+            ("near2", -40),
+        ]);
+        assert_eq!(ordered, vec!["near", "near2", "mid", "far"]);
+    }
+
+    #[test]
+    fn only_authentication_errors_blame_the_password() {
+        assert!(is_auth_failure(1));
+        assert!(is_auth_failure(-3924));
+        assert!(!is_auth_failure(-3900));
+        assert!(!is_auth_failure(-3906));
+
+        let general = join_failure_message(
+            "608",
+            "The operation couldn't be completed. tmpErr.",
+            -3900,
+            true,
+        );
+        assert!(!general.contains("password is correct"), "{general}");
+        assert!(general.contains("tmpErr (error -3900)"), "{general}");
+
+        let auth = join_failure_message("608", "EAPOL", 1, true);
+        assert!(
+            auth.contains("Check that the password is correct"),
+            "{auth}"
+        );
+
+        let open = join_failure_message("608", "EAPOL", 1, false);
+        assert!(!open.contains("password is correct"), "{open}");
+    }
 
     #[test]
     fn detects_networksetup_failure_text() {
